@@ -141,6 +141,22 @@ final class Event implements JsonSerializable
     }
 
     /**
+     * 返回用户属性操作集合。
+     */
+    public function userProperties(): UserPropertyOptions
+    {
+        return $this->userProperties;
+    }
+
+    /**
+     * 返回事件名。
+     */
+    public function event(): string
+    {
+        return $this->event;
+    }
+
+    /**
      * 导出 JSON。
      *
      * @return array<string, mixed>
