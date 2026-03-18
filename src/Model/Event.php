@@ -141,6 +141,22 @@ final class Event implements JsonSerializable
     }
 
     /**
+     * 返回匿名 ID。
+     */
+    public function anonId(): string
+    {
+        return $this->anonId;
+    }
+
+    /**
+     * 返回登录 ID。
+     */
+    public function loginId(): string
+    {
+        return $this->loginId;
+    }
+
+    /**
      * 返回用户属性操作集合。
      */
     public function userProperties(): UserPropertyOptions
