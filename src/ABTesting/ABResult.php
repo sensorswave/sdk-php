@@ -29,4 +29,31 @@ final class ABResult
     {
         return $this->variantId === 'pass';
     }
+
+    /**
+     * 读取字符串参数。
+     */
+    public function getString(string $key, string $fallback): string
+    {
+        $value = $this->variantParamValue[$key] ?? null;
+        return is_string($value) ? $value : $fallback;
+    }
+
+    /**
+     * 读取数值参数。
+     */
+    public function getNumber(string $key, float $fallback): float
+    {
+        $value = $this->variantParamValue[$key] ?? null;
+        return is_int($value) || is_float($value) ? (float) $value : $fallback;
+    }
+
+    /**
+     * 读取布尔参数。
+     */
+    public function getBool(string $key, bool $fallback): bool
+    {
+        $value = $this->variantParamValue[$key] ?? null;
+        return is_bool($value) ? $value : $fallback;
+    }
 }

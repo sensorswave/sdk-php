@@ -62,33 +62,31 @@ final class ABCore
         );
 
         $pass = false;
-        if ($this->evaluateRules($user, $spec, 'OVERRIDE', $evalId, $result, stopOnMiss: false)) {
+        if ($this->evaluateOverrideRules($user, $spec, $evalId, $result)) {
             return $this->finalizeGateResult($spec, $result, true);
         }
 
-        if ($this->evaluateRules($user, $spec, 'TRAFFIC', $evalId, $result, stopOnMiss: true)) {
+        if ($this->evaluateTrafficRules($user, $spec, $evalId, $result)) {
             return $this->finalizeGateResult($spec, $result, false);
         }
 
-        if ($this->evaluateRules($user, $spec, 'GATE', $evalId, $result, stopOnMiss: false)) {
+        if ($this->evaluateGateRules($user, $spec, $evalId, $result)) {
             $pass = true;
+        }
+
+        if ($spec->type === self::TYPE_EXPERIMENT && $pass && $result->variantId === null) {
+            $this->evaluateGroupRules($user, $spec, $evalId, $result);
         }
 
         return $this->finalizeGateResult($spec, $result, $pass);
     }
 
     /**
-     * 处理规则集合。
+     * 处理 override 规则。
      */
-    private function evaluateRules(
-        User $user,
-        ABSpec $spec,
-        string $ruleType,
-        string $evalId,
-        ABResult $result,
-        bool $stopOnMiss
-    ): bool {
-        $rules = $spec->rules[$ruleType] ?? [];
+    private function evaluateOverrideRules(User $user, ABSpec $spec, string $evalId, ABResult $result): bool
+    {
+        $rules = $spec->rules['OVERRIDE'] ?? [];
         foreach ($rules as $rule) {
             $pass = $this->evaluateRule($user, $rule, $evalId);
             if ($pass) {
@@ -99,10 +97,23 @@ final class ABCore
 
                 return true;
             }
+        }
 
-            if ($stopOnMiss) {
+        return false;
+    }
+
+    /**
+     * 处理 traffic 规则。
+     */
+    private function evaluateTrafficRules(User $user, ABSpec $spec, string $evalId, ABResult $result): bool
+    {
+        $rules = $spec->rules['TRAFFIC'] ?? [];
+        foreach ($rules as $rule) {
+            $pass = $this->evaluateRule($user, $rule, $evalId);
+            if (!$pass) {
                 if ($rule->override !== null) {
                     $result->variantId = $rule->override;
+                    $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
                 }
 
                 return true;
@@ -110,6 +121,42 @@ final class ABCore
         }
 
         return false;
+    }
+
+    /**
+     * 处理 gate 规则。
+     */
+    private function evaluateGateRules(User $user, ABSpec $spec, string $evalId, ABResult $result): bool
+    {
+        $rules = $spec->rules['GATE'] ?? [];
+        foreach ($rules as $rule) {
+            $pass = $this->evaluateRule($user, $rule, $evalId);
+            if ($pass) {
+                if ($rule->override !== null) {
+                    $result->variantId = $rule->override;
+                    $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 处理实验分组规则。
+     */
+    private function evaluateGroupRules(User $user, ABSpec $spec, string $evalId, ABResult $result): void
+    {
+        $rules = $spec->rules['GROUP'] ?? [];
+        foreach ($rules as $rule) {
+            if ($this->evaluateRule($user, $rule, $evalId) && $rule->override !== null) {
+                $result->variantId = $rule->override;
+                $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
+                return;
+            }
+        }
     }
 
     /**
