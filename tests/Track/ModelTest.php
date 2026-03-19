@@ -82,4 +82,16 @@ final class ModelTest extends TestCase
         self::assertSame(['region' => 'cn'], $user->abUserProperties()->all());
         self::assertSame(['region' => 'cn', 'plan' => 'pro'], $mutated->abUserProperties()->all());
     }
+
+    public function testUserSupportsPlainPhpArraysForAbUserProperties(): void
+    {
+        $user = new User('anon-123', 'user-456', ['region' => 'cn']);
+        $mutated = $user->withAbUserProperties(['plan' => 'pro']);
+
+        self::assertSame(['region' => 'cn'], $user->abUserProperties()->all());
+        self::assertSame(
+            ['region' => 'cn', 'plan' => 'pro'],
+            $mutated->abUserProperties()->all()
+        );
+    }
 }

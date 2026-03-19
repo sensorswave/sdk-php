@@ -501,6 +501,13 @@ final class Client
             $this->abCore->replaceStorage($result->storage);
             return $this->abCore;
         } catch (JsonException|\RuntimeException|\InvalidArgumentException) {
+            $this->config->logger->error(
+                'ab meta refresh failed',
+                [
+                    'source_token' => $this->sourceToken,
+                    'force_initialize' => $forceInitialize,
+                ]
+            );
             return $forceInitialize ? null : $this->abCore;
         }
     }

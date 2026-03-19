@@ -336,6 +336,56 @@ final class ClientABTest extends TestCase
         $client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec');
     }
 
+    public function testClientLogsEachInitializationFailureWhenRemoteMetaFails(): void
+    {
+        $transport = new class implements TransportInterface {
+            public function send(Request $request): Response
+            {
+                return new Response(500, '{"msg":"fail"}');
+            }
+        };
+        $logger = new class implements \SensorsWave\Contract\LoggerInterface {
+            /** @var list<string> */
+            public array $errors = [];
+
+            public function debug(string $message, mixed ...$context): void
+            {
+            }
+
+            public function info(string $message, mixed ...$context): void
+            {
+            }
+
+            public function warn(string $message, mixed ...$context): void
+            {
+            }
+
+            public function error(string $message, mixed ...$context): void
+            {
+                $this->errors[] = $message;
+            }
+        };
+
+        $client = Client::create(
+            'http://example.com',
+            'test-token',
+            new Config(
+                logger: $logger,
+                transport: $transport,
+                ab: new ABConfig(projectSecret: 'secret')
+            )
+        );
+
+        try {
+            $client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec');
+            self::fail('client should fail when ab core is not initialized');
+        } catch (InvalidArgumentException) {
+            self::assertCount(2, $logger->errors);
+            self::assertStringContainsString('ab meta refresh failed', $logger->errors[0]);
+            self::assertStringContainsString('ab meta refresh failed', $logger->errors[1]);
+        }
+    }
+
     public function testClientRefreshesRemoteMetaOnNextEvaluationAfterInterval(): void
     {
         $firstPayload = json_encode([
@@ -452,5 +502,76 @@ final class ClientABTest extends TestCase
             static fn (Request $request): bool => $request->method === 'GET'
         ));
         self::assertCount(2, $getRequests);
+    }
+
+    public function testClientLogsRefreshFailureAndKeepsExistingStorage(): void
+    {
+        $initialPayload = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
+
+        $transport = new class ($initialPayload) implements TransportInterface {
+            /** @var list<Request> */
+            public array $requests = [];
+            private int $getCalls = 0;
+
+            public function __construct(private readonly string $initialPayload)
+            {
+            }
+
+            public function send(Request $request): Response
+            {
+                $this->requests[] = $request;
+
+                if ($request->method === 'GET') {
+                    $this->getCalls++;
+                    if ($this->getCalls === 1) {
+                        return new Response(200, $this->initialPayload);
+                    }
+
+                    return new Response(500, '{"msg":"refresh-fail"}');
+                }
+
+                return new Response(200, '{}');
+            }
+        };
+        $logger = new class implements \SensorsWave\Contract\LoggerInterface {
+            /** @var list<string> */
+            public array $errors = [];
+
+            public function debug(string $message, mixed ...$context): void
+            {
+            }
+
+            public function info(string $message, mixed ...$context): void
+            {
+            }
+
+            public function warn(string $message, mixed ...$context): void
+            {
+            }
+
+            public function error(string $message, mixed ...$context): void
+            {
+                $this->errors[] = $message;
+            }
+        };
+
+        $client = Client::create(
+            'http://example.com',
+            'test-token',
+            new Config(
+                logger: $logger,
+                transport: $transport,
+                ab: new ABConfig(
+                    projectSecret: 'secret',
+                    metaLoadIntervalMs: 10,
+                )
+            )
+        );
+
+        self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        usleep(20_000);
+        self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        self::assertCount(1, $logger->errors);
+        self::assertStringContainsString('ab meta refresh failed', $logger->errors[0]);
     }
 }

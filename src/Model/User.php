@@ -14,9 +14,13 @@ final class User
     public function __construct(
         private string $anonId = '',
         private string $loginId = '',
-        ?Properties $abUserProperties = null,
+        array|Properties|null $abUserProperties = null,
     ) {
-        $this->abUserProperties = $abUserProperties ?? Properties::create();
+        $this->abUserProperties = match (true) {
+            $abUserProperties instanceof Properties => $abUserProperties,
+            is_array($abUserProperties) => Properties::fromArray($abUserProperties),
+            default => Properties::create(),
+        };
     }
 
     /**
@@ -57,10 +61,14 @@ final class User
     /**
      * 返回添加了多个 A/B 属性的新用户对象。
      */
-    public function withAbUserProperties(Properties $properties): self
+    public function withAbUserProperties(array|Properties $properties): self
     {
+        $normalizedProperties = is_array($properties)
+            ? Properties::fromArray($properties)
+            : $properties;
+
         $merged = Properties::fromArray($this->abUserProperties->all())
-            ->merge($properties);
+            ->merge($normalizedProperties);
 
         return new self($this->anonId, $this->loginId, $merged);
     }
