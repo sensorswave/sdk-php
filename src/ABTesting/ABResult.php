@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SensorsWave\ABTesting;
 
+use JsonException;
+
 /**
  * A/B 求值结果。
  */
@@ -81,5 +83,15 @@ final class ABResult
     {
         $value = $this->variantParamValue[$key] ?? null;
         return is_array($value) && !array_is_list($value) ? $value : $fallback;
+    }
+
+    /**
+     * 以 JSON 形式导出当前 payload。
+     *
+     * @throws JsonException
+     */
+    public function jsonPayload(): string
+    {
+        return json_encode($this->variantParamValue, JSON_THROW_ON_ERROR);
     }
 }
