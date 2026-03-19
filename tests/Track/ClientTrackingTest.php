@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace SensorsWave\Tests\Track;
 
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use SensorsWave\Client\Client;
 use SensorsWave\Config\Config;
 use SensorsWave\Exception\EmptyUserIdsException;
 use SensorsWave\Exception\IdentifyRequiresBothIdsException;
+use SensorsWave\Http\Request;
+use SensorsWave\Http\Response;
+use SensorsWave\Http\TransportInterface;
 use SensorsWave\Model\Properties;
 use SensorsWave\Model\User;
 use SensorsWave\Tests\Support\FakeTransport;
@@ -141,5 +145,118 @@ final class ClientTrackingTest extends TestCase
 
         $this->expectException(EmptyUserIdsException::class);
         $client->trackEvent(new User('', ''), 'PageView', Properties::create());
+    }
+
+    public function testTrackEventRetriesFailedHttpResponsesAndInvokesFailureHandler(): void
+    {
+        $transport = new class implements TransportInterface {
+            /** @var list<Request> */
+            public array $requests = [];
+
+            public function send(Request $request): Response
+            {
+                $this->requests[] = $request;
+                return new Response(500, '{"msg":"fail"}');
+            }
+        };
+
+        $failedEvents = null;
+        $failedStatusCode = null;
+        $failedError = null;
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(
+                transport: $transport,
+                httpRetry: 2,
+                onTrackFailHandler: function (array $events, ?\Throwable $error, ?int $statusCode) use (&$failedEvents, &$failedError, &$failedStatusCode): void {
+                    $failedEvents = $events;
+                    $failedError = $error;
+                    $failedStatusCode = $statusCode;
+                }
+            )
+        );
+
+        $client->trackEvent(new User('anon-123', 'user-456'), 'RetryEvent', ['page' => '/retry']);
+
+        self::assertCount(3, $transport->requests);
+        self::assertIsArray($failedEvents);
+        self::assertCount(1, $failedEvents);
+        self::assertSame('RetryEvent', $failedEvents[0]['event']);
+        self::assertNull($failedError);
+        self::assertSame(500, $failedStatusCode);
+    }
+
+    public function testTrackEventRetriesTransportExceptionsAndInvokesFailureHandler(): void
+    {
+        $transport = new class implements TransportInterface {
+            public int $attempts = 0;
+
+            public function send(Request $request): Response
+            {
+                $this->attempts++;
+                throw new RuntimeException('network down');
+            }
+        };
+
+        $failedEvents = null;
+        $failedError = null;
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(
+                transport: $transport,
+                httpRetry: 1,
+                onTrackFailHandler: function (array $events, ?\Throwable $error, ?int $statusCode) use (&$failedEvents, &$failedError): void {
+                    $failedEvents = $events;
+                    $failedError = $error;
+                    self::assertNull($statusCode);
+                }
+            )
+        );
+
+        $client->trackEvent(new User('anon-123', 'user-456'), 'RetryExceptionEvent', ['page' => '/retry-ex']);
+
+        self::assertSame(2, $transport->attempts);
+        self::assertIsArray($failedEvents);
+        self::assertCount(1, $failedEvents);
+        self::assertSame('RetryExceptionEvent', $failedEvents[0]['event']);
+        self::assertInstanceOf(RuntimeException::class, $failedError);
+        self::assertSame('network down', $failedError->getMessage());
+    }
+
+    public function testTrackEventDoesNotInvokeFailureHandlerAfterSuccessfulRetry(): void
+    {
+        $transport = new class implements TransportInterface {
+            public int $attempts = 0;
+
+            public function send(Request $request): Response
+            {
+                $this->attempts++;
+                if ($this->attempts === 1) {
+                    return new Response(500, '{"msg":"retry"}');
+                }
+
+                return new Response(200, '{}');
+            }
+        };
+
+        $invoked = false;
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(
+                transport: $transport,
+                httpRetry: 2,
+                onTrackFailHandler: function () use (&$invoked): void {
+                    $invoked = true;
+                }
+            )
+        );
+
+        $client->trackEvent(new User('anon-123', 'user-456'), 'RetrySuccessEvent', ['page' => '/ok']);
+
+        self::assertSame(2, $transport->attempts);
+        self::assertFalse($invoked);
     }
 }

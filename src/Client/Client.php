@@ -16,6 +16,7 @@ use SensorsWave\Exception\EmptyUserIdsException;
 use SensorsWave\Exception\IdentifyRequiresBothIdsException;
 use SensorsWave\Http\HttpClient;
 use SensorsWave\Http\Request;
+use SensorsWave\Http\Response;
 use SensorsWave\Http\TransportInterface;
 use SensorsWave\Model\Event;
 use SensorsWave\Model\ListProperties;
@@ -108,18 +109,7 @@ final class Client
 
         $event->normalize();
         $body = EventSerializer::serializeBatch([$event]);
-
-        $this->transport->send(
-            new Request(
-                'POST',
-                $this->normalizedEndpoint . $this->config->trackUriPath,
-                [
-                    'Content-Type' => 'application/json',
-                    'SourceToken' => $this->sourceToken,
-                ],
-                $body
-            )
-        );
+        $this->sendTrackRequest($body);
     }
 
     /**
@@ -390,6 +380,79 @@ final class Client
         }
 
         $this->track(ABImpressionFactory::create($user, $result));
+    }
+
+    /**
+     * 发送埋点请求，并按配置执行重试和失败回调。
+     */
+    private function sendTrackRequest(string $body): void
+    {
+        $request = new Request(
+            'POST',
+            $this->normalizedEndpoint . $this->config->trackUriPath,
+            [
+                'Content-Type' => 'application/json',
+                'SourceToken' => $this->sourceToken,
+            ],
+            $body
+        );
+
+        $attempts = max(0, $this->config->httpRetry) + 1;
+        $lastError = null;
+        $lastStatusCode = null;
+        for ($attempt = 0; $attempt < $attempts; $attempt++) {
+            try {
+                $response = $this->transport->send($request);
+                $lastStatusCode = $response->statusCode;
+                if ($this->isSuccessfulTrackResponse($response)) {
+                    return;
+                }
+            } catch (\Throwable $throwable) {
+                $lastError = $throwable;
+                $lastStatusCode = null;
+            }
+        }
+
+        $this->config->logger->error(
+            'track request failed',
+            [
+                'source_token' => $this->sourceToken,
+                'status_code' => $lastStatusCode,
+                'error' => $lastError?->getMessage(),
+            ]
+        );
+        $this->notifyTrackFailure($body, $lastError, $lastStatusCode);
+    }
+
+    /**
+     * 判断埋点响应是否成功。
+     */
+    private function isSuccessfulTrackResponse(Response $response): bool
+    {
+        return $response->statusCode === 200;
+    }
+
+    /**
+     * 回调通知埋点失败。
+     */
+    private function notifyTrackFailure(string $body, ?\Throwable $error, ?int $statusCode): void
+    {
+        if ($this->config->onTrackFailHandler === null) {
+            return;
+        }
+
+        try {
+            /** @var list<array<string, mixed>> $events */
+            $events = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            $this->config->logger->error(
+                'track fail handler payload decode failed',
+                ['error' => $exception->getMessage()]
+            );
+            $events = [];
+        }
+
+        ($this->config->onTrackFailHandler)($events, $error, $statusCode);
     }
 
     /**
