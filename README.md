@@ -107,6 +107,7 @@ $user = new User(loginId: 'user-123');
 $gatePassed = $client->checkFeatureGate($user, 'my_gate');
 $config = $client->getFeatureConfig($user, 'my_config');
 $experiment = $client->getExperiment($user, 'my_experiment');
+$allResults = $client->evaluateAll($user);
 ```
 
 ### Read variant payloads
@@ -180,6 +181,9 @@ Current public methods include:
 - `evaluate(User $user, string $key, ?int $type = null): ABResult`
 - `evaluateAll(User $user): array`
 - `getABSpecs(): string`
+
+At the client layer, you can also call `evaluateAll(User $user): array` to
+fetch all current results and emit impression events for each returned spec.
 
 ## Development
 

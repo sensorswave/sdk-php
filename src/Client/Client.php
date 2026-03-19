@@ -227,9 +227,7 @@ final class Client
         $this->validateUser($user);
         $this->ensureABCoreFresh();
         $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_GATE);
-        if (!$result->disableImpress && $result->key !== '') {
-            $this->track(ABImpressionFactory::create($user, $result));
-        }
+        $this->trackABImpressionIfNeeded($user, $result);
 
         return $result->checkFeatureGate();
     }
@@ -242,9 +240,7 @@ final class Client
         $this->validateUser($user);
         $this->ensureABCoreFresh();
         $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_CONFIG);
-        if (!$result->disableImpress && $result->key !== '') {
-            $this->track(ABImpressionFactory::create($user, $result));
-        }
+        $this->trackABImpressionIfNeeded($user, $result);
 
         return $result;
     }
@@ -257,11 +253,27 @@ final class Client
         $this->validateUser($user);
         $this->ensureABCoreFresh();
         $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_EXPERIMENT);
-        if (!$result->disableImpress && $result->key !== '') {
-            $this->track(ABImpressionFactory::create($user, $result));
-        }
+        $this->trackABImpressionIfNeeded($user, $result);
 
         return $result;
+    }
+
+    /**
+     * 批量获取当前 metadata 中的全部 A/B 结果。
+     *
+     * @return list<ABResult>
+     */
+    public function evaluateAll(User $user): array
+    {
+        $this->validateUser($user);
+        $this->ensureABCoreFresh();
+
+        $results = $this->requireABCore()->evaluateAll($user);
+        foreach ($results as $result) {
+            $this->trackABImpressionIfNeeded($user, $result);
+        }
+
+        return $results;
     }
 
     /**
@@ -366,6 +378,18 @@ final class Client
         return Event::create($user->anonId(), $user->loginId(), Predefined::EVENT_USER_SET)
             ->withUserPropertyOptions($options)
             ->withProperties(Properties::create()->set(Predefined::USER_SET_TYPE, $type));
+    }
+
+    /**
+     * 在启用曝光时发送 A/B 曝光事件。
+     */
+    private function trackABImpressionIfNeeded(User $user, ABResult $result): void
+    {
+        if ($result->disableImpress || $result->key === '') {
+            return;
+        }
+
+        $this->track(ABImpressionFactory::create($user, $result));
     }
 
     /**

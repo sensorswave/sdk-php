@@ -67,6 +67,50 @@ final class ClientABTest extends TestCase
         self::assertContains($experimentResult->variantId, ['v1', 'v2', null]);
     }
 
+    public function testClientCanEvaluateAllABResultsAndTrackImpressions(): void
+    {
+        $transport = new FakeTransport();
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(
+                transport: $transport,
+                ab: new ABConfig(
+                    loadABSpecs: file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/multi_gates.json') ?: ''
+                )
+            )
+        );
+
+        $results = $client->evaluateAll(new User(
+            '',
+            'user5',
+            \SensorsWave\Model\Properties::create()
+                ->set('$app_version', '10.5')
+                ->set('$country', 'JP')
+        ));
+
+        self::assertCount(3, $results);
+
+        $resultMap = [];
+        foreach ($results as $result) {
+            $resultMap[$result->key] = $result;
+        }
+
+        self::assertTrue($resultMap['Gate_A']->checkFeatureGate());
+        self::assertTrue($resultMap['Gate_B']->checkFeatureGate());
+        self::assertFalse($resultMap['Gate_C']->checkFeatureGate());
+
+        self::assertCount(3, $transport->requests);
+
+        $payloads = array_map(
+            static fn (Request $request): array => json_decode($request->body, true, 512, JSON_THROW_ON_ERROR),
+            $transport->requests
+        );
+        self::assertSame('$FeatureImpress', $payloads[0][0]['event']);
+        self::assertSame('$FeatureImpress', $payloads[1][0]['event']);
+        self::assertSame('$FeatureImpress', $payloads[2][0]['event']);
+    }
+
     public function testClientCanLoadRemoteMetaWithCustomEndpointAndPath(): void
     {
         $metaBody = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
