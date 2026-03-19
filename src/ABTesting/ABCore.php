@@ -6,6 +6,7 @@ namespace SensorsWave\ABTesting;
 
 use DateTimeImmutable;
 use JsonException;
+use RuntimeException;
 use SensorsWave\ABTesting\Model\ABSpec;
 use SensorsWave\ABTesting\Model\Condition;
 use SensorsWave\ABTesting\Model\Rule;
@@ -257,7 +258,7 @@ final class ABCore
     private function evaluateCondition(User $user, Condition $condition, string $evalId): bool
     {
         $left = match (strtolower($condition->fieldClass)) {
-            'common' => strtolower($condition->field) === 'public' ? true : null,
+            'common' => $this->commonValue($condition->field),
             'ffuser' => $this->ffUserValue($user, $condition->field),
             'props' => $user->abUserProperties()->get($condition->field),
             'bucket' => $condition->field,
@@ -289,10 +290,21 @@ final class ABCore
             'neq' => !$this->deepEqual($left, $condition->value),
             'before' => $this->compareTimes($left, $condition->value, static fn (int $cmp): bool => $cmp < 0),
             'after' => $this->compareTimes($left, $condition->value, static fn (int $cmp): bool => $cmp > 0),
-            'bucket_set' => is_string($left) && is_string($condition->value) ? $this->bucketSetContains($evalId, $left, $condition->value) : false,
+            'bucket_set' => $this->evaluateBucketSetCondition($evalId, $left, $condition->value),
             'gate_pass' => $this->evaluateGateDependency($user, $condition->field, false),
             'gate_fail' => $this->evaluateGateDependency($user, $condition->field, true),
             default => false,
+        };
+    }
+
+    /**
+     * 返回 COMMON 取值。
+     */
+    private function commonValue(string $field): bool
+    {
+        return match (strtolower($field)) {
+            'public' => true,
+            default => throw new RuntimeException('unknown common field: ' . $field),
         };
     }
 
@@ -444,6 +456,18 @@ final class ABCore
 
         $byte = ord($bitmap[$byteIndex]);
         return (($byte >> (7 - $bitIndex)) & 1) === 1;
+    }
+
+    /**
+     * 判断 BUCKET_SET 条件。
+     */
+    private function evaluateBucketSetCondition(string $evalId, mixed $left, mixed $right): bool
+    {
+        if (!is_string($left) || !is_string($right)) {
+            throw new RuntimeException('bucket_set requires string salt and bitmap');
+        }
+
+        return $this->bucketSetContains($evalId, $left, $right);
     }
 
     /**

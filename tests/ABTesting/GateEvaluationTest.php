@@ -6,8 +6,14 @@ namespace SensorsWave\Tests\ABTesting;
 
 use PHPUnit\Framework\TestCase;
 use SensorsWave\ABTesting\ABCore;
-use SensorsWave\Model\User;
+use RuntimeException;
+use SensorsWave\ABTesting\Model\ABEnv;
+use SensorsWave\ABTesting\Model\ABSpec;
+use SensorsWave\ABTesting\Model\Condition;
+use SensorsWave\ABTesting\Model\Rule;
+use SensorsWave\ABTesting\Storage;
 use SensorsWave\Model\Properties;
+use SensorsWave\Model\User;
 use SensorsWave\Tests\Support\FixtureLoader;
 use SensorsWave\Tests\Support\MemoryStickyHandler;
 
@@ -532,5 +538,112 @@ final class GateEvaluationTest extends TestCase
             'AnonIdTest',
             ABCore::TYPE_GATE
         )->checkFeatureGate());
+    }
+
+    public function testInvalidCommonConditionRaisesRuntimeException(): void
+    {
+        $core = new ABCore(new Storage(
+            1,
+            new ABEnv(),
+            [
+                'broken_gate' => new ABSpec(
+                    1,
+                    'broken_gate',
+                    'Broken Gate',
+                    ABCore::TYPE_GATE,
+                    '',
+                    'LOGIN_ID',
+                    true,
+                    false,
+                    '',
+                    1,
+                    false,
+                    [
+                        'GATE' => [
+                            new Rule(
+                                'invalid-common',
+                                'r1',
+                                '',
+                                100.0,
+                                [new Condition('COMMON', 'unknown', 'IS_TRUE', null)],
+                                null
+                            ),
+                        ],
+                    ],
+                    []
+                ),
+            ]
+        ));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('unknown common field');
+        $core->evaluate(new User('', 'u'), 'broken_gate', ABCore::TYPE_GATE);
+    }
+
+    public function testStickyWriteExceptionPropagates(): void
+    {
+        $handler = new class implements \SensorsWave\Contract\StickyHandlerInterface {
+            public function getStickyResult(string $key): ?string
+            {
+                return null;
+            }
+
+            public function setStickyResult(string $key, string $result): void
+            {
+                throw new RuntimeException('sticky write failed');
+            }
+        };
+
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/sticky.json'
+        ), $handler);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('sticky write failed');
+        $core->evaluate(
+            new User('', 'user-fail', Properties::create()->set('is_premium', true)),
+            'Sticky_Is_True_Gate',
+            ABCore::TYPE_GATE
+        );
+    }
+
+    public function testInvalidBucketSetConditionRaisesRuntimeException(): void
+    {
+        $core = new ABCore(new Storage(
+            1,
+            new ABEnv(),
+            [
+                'broken_bucket_gate' => new ABSpec(
+                    2,
+                    'broken_bucket_gate',
+                    'Broken Bucket Gate',
+                    ABCore::TYPE_GATE,
+                    '',
+                    'LOGIN_ID',
+                    true,
+                    false,
+                    '',
+                    1,
+                    false,
+                    [
+                        'GATE' => [
+                            new Rule(
+                                'invalid-bucket-set',
+                                'r2',
+                                '',
+                                100.0,
+                                [new Condition('BUCKET', 'salt', 'BUCKET_SET', 123)],
+                                null
+                            ),
+                        ],
+                    ],
+                    []
+                ),
+            ]
+        ));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('bucket_set requires string salt and bitmap');
+        $core->evaluate(new User('', 'u'), 'broken_bucket_gate', ABCore::TYPE_GATE);
     }
 }
