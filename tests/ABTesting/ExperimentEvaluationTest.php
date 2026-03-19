@@ -176,6 +176,62 @@ final class ExperimentEvaluationTest extends TestCase
         self::assertNotNull($holdoutUser);
     }
 
+    public function testExperimentHoldoutRateAndVariantsStayInExpectedRange(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/exp/holdout.json'
+        ));
+
+        $totalUsers = 1000;
+        $holdoutCount = 0;
+        $variantCount = [];
+        for ($index = 0; $index < $totalUsers; $index++) {
+            $result = $core->evaluate(
+                new User('', 'holdout-user-' . $index),
+                'BKduZnxYPD',
+                ABCore::TYPE_EXPERIMENT
+            );
+            self::assertNotNull($result->variantId);
+            if ($result->variantId === 'holdout') {
+                $holdoutCount++;
+                continue;
+            }
+            $variantCount[$result->variantId] = ($variantCount[$result->variantId] ?? 0) + 1;
+        }
+
+        self::assertGreaterThan(0, $variantCount['v1'] ?? 0);
+        self::assertGreaterThan(0, $variantCount['v2'] ?? 0);
+        self::assertEqualsWithDelta(0.10, $holdoutCount / $totalUsers, 0.03);
+    }
+
+    public function testExperimentLayerWithHoldoutRateStaysNearExpectedRange(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/exp/layer_with_holdout.json'
+        ));
+
+        $totalUsers = 1000;
+        $holdoutCount = 0;
+        $variantCount = [];
+        for ($index = 0; $index < $totalUsers; $index++) {
+            $result = $core->evaluate(
+                new User('', 'layer-holdout-user-' . $index),
+                'ARQjYcfVPI',
+                ABCore::TYPE_EXPERIMENT
+            );
+            self::assertNotNull($result->variantId);
+            if ($result->variantId === 'holdout') {
+                $holdoutCount++;
+                continue;
+            }
+            $variantCount[$result->variantId] = ($variantCount[$result->variantId] ?? 0) + 1;
+        }
+
+        self::assertGreaterThan(0, $variantCount['v1'] ?? 0);
+        self::assertGreaterThan(0, $variantCount['v2'] ?? 0);
+        self::assertEqualsWithDelta(0.10, $holdoutCount / $totalUsers, 0.03);
+    }
+
     public function testExperimentTrafficRolloutCanExcludeUsers(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(

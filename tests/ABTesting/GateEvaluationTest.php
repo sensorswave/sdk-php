@@ -88,6 +88,17 @@ final class GateEvaluationTest extends TestCase
 
         self::assertTrue($nullResult->checkFeatureGate());
         self::assertTrue($notNullResult->checkFeatureGate());
+
+        self::assertFalse($isNullCore->evaluate(
+            new User('', 'user-pass', Properties::create()->set('$browser_name', '')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+        self::assertTrue($isNotNullCore->evaluate(
+            new User('', 'user-pass', Properties::create()->set('$browser_name', '')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
     }
 
     public function testDisabledAndMissingKeyReturnFalse(): void
@@ -163,6 +174,32 @@ final class GateEvaluationTest extends TestCase
         self::assertTrue($neqCore->evaluate(
             new User('', 'user-1', Properties::create()->set('level', 1)),
             'NEQ_Number_Gate',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+    }
+
+    public function testGateVersionNeqAndEmptyRulesFallbackToFalse(): void
+    {
+        $versionNeqCore = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/not_equal.json'
+        ));
+        $emptyRulesCore = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/missing_gate_rules.json'
+        ));
+
+        self::assertFalse($versionNeqCore->evaluate(
+            new User('', 'user-pass', Properties::create()->set('$app_version', '10.0')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+        self::assertTrue($versionNeqCore->evaluate(
+            new User('', 'user-pass', Properties::create()->set('$app_version', '10.1')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+        self::assertFalse($emptyRulesCore->evaluate(
+            new User('', 'user-any'),
+            'TestSpec',
             ABCore::TYPE_GATE
         )->checkFeatureGate());
     }
@@ -269,6 +306,20 @@ final class GateEvaluationTest extends TestCase
             'AnonIdTest',
             ABCore::TYPE_GATE
         )->checkFeatureGate());
+
+        self::assertTrue($customCore->evaluate(
+            new User('', 'user-1', Properties::create()->set('time', '2025-11-18T06:00:40Z')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+        self::assertFalse($customCore->evaluate(
+            new User('', 'user-pass', Properties::create()
+                ->set('$app_version', '9.0')
+                ->set('$browser_name', 'Firefox')
+                ->set('age', 10)),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
     }
 
     public function testEvaluateAllReturnsAllGateResultsIncludingFailures(): void
@@ -299,6 +350,53 @@ final class GateEvaluationTest extends TestCase
         self::assertTrue($resultMap['Gate_B']->checkFeatureGate());
         self::assertFalse($resultMap['Gate_C']->checkFeatureGate());
         self::assertSame('fail', $resultMap['Gate_C']->variantId);
+    }
+
+    public function testEvaluateAllMultipleUsersPreservesPassFailCombinations(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/multi_gates.json'
+        ));
+
+        $testCases = [
+            [
+                'user' => new User('', 'user1', Properties::create()->set('$app_version', '10.0')->set('$country', 'CN')->set('is_premium', true)),
+                'expected' => ['Gate_A' => true, 'Gate_B' => true, 'Gate_C' => true],
+                'hitCount' => 3,
+            ],
+            [
+                'user' => new User('', 'user5', Properties::create()->set('$app_version', '10.5')->set('$country', 'JP')),
+                'expected' => ['Gate_A' => true, 'Gate_B' => true, 'Gate_C' => false],
+                'hitCount' => 2,
+            ],
+            [
+                'user' => new User('', 'user6', Properties::create()->set('$app_version', '9.0')->set('$country', 'KR')->set('is_premium', false)),
+                'expected' => ['Gate_A' => false, 'Gate_B' => false, 'Gate_C' => false],
+                'hitCount' => 0,
+            ],
+        ];
+
+        foreach ($testCases as $testCase) {
+            $results = $core->evaluateAll($testCase['user']);
+            self::assertCount(3, $results);
+
+            $resultMap = [];
+            foreach ($results as $result) {
+                $resultMap[$result->key] = $result;
+            }
+
+            $hitCount = 0;
+            foreach ($testCase['expected'] as $key => $expectedPass) {
+                self::assertArrayHasKey($key, $resultMap);
+                self::assertSame($expectedPass, $resultMap[$key]->checkFeatureGate());
+                self::assertSame($expectedPass ? 'pass' : 'fail', $resultMap[$key]->variantId);
+                if ($resultMap[$key]->checkFeatureGate()) {
+                    $hitCount++;
+                }
+            }
+
+            self::assertSame($testCase['hitCount'], $hitCount);
+        }
     }
 
     public function testGateNoneOfSensitivePropsAndReleaseGate(): void

@@ -26,6 +26,32 @@ final class ConfigEvaluationTest extends TestCase
         self::assertContains($result->getString('color', ''), ['blue', 'red', 'orange']);
     }
 
+    public function testConfigPublicDistributionMatchesRolloutChain(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/config/public.json'
+        ));
+
+        $totalUsers = 1000;
+        $counts = [];
+        for ($index = 0; $index < $totalUsers; $index++) {
+            $result = $core->evaluate(
+                new User('', 'config-public-user-' . $index),
+                'bMHsfOAUKx',
+                ABCore::TYPE_CONFIG
+            );
+            self::assertNotNull($result->variantId);
+            $counts[$result->variantId] = ($counts[$result->variantId] ?? 0) + 1;
+        }
+
+        self::assertArrayHasKey('v1', $counts);
+        self::assertArrayHasKey('v2', $counts);
+        self::assertArrayHasKey('v3', $counts);
+        self::assertEqualsWithDelta(0.10, $counts['v1'] / $totalUsers, 0.05);
+        self::assertEqualsWithDelta(0.30, $counts['v2'] / $totalUsers, 0.05);
+        self::assertEqualsWithDelta(0.60, $counts['v3'] / $totalUsers, 0.05);
+    }
+
     public function testConfigOverrideHonorsExplicitUserRule(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
@@ -55,6 +81,33 @@ final class ConfigEvaluationTest extends TestCase
         }
 
         self::assertNotNull($holdoutUser);
+    }
+
+    public function testConfigHoldoutRateStaysNearExpectedRange(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/config/holdout.json'
+        ));
+
+        $totalUsers = 1000;
+        $holdoutCount = 0;
+        $variantCount = [];
+        for ($index = 0; $index < $totalUsers; $index++) {
+            $result = $core->evaluate(
+                new User('', 'config-holdout-user-' . $index),
+                'bMHsfOAUKx',
+                ABCore::TYPE_CONFIG
+            );
+            self::assertNotNull($result->variantId);
+            if ($result->variantId === 'holdout') {
+                $holdoutCount++;
+                continue;
+            }
+            $variantCount[$result->variantId] = ($variantCount[$result->variantId] ?? 0) + 1;
+        }
+
+        self::assertEquals($totalUsers - $holdoutCount, array_sum($variantCount));
+        self::assertEqualsWithDelta(0.10, $holdoutCount / $totalUsers, 0.03);
     }
 
     public function testConfigStickyUsesCacheAndPersistsResult(): void
