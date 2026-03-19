@@ -86,12 +86,13 @@ final class Client
     /**
      * 发送自定义事件。
      */
-    public function trackEvent(User $user, string $eventName, Properties $properties): void
+    public function trackEvent(User $user, string $eventName, array|Properties $properties = []): void
     {
         $this->validateUser($user);
+        $normalizedProperties = $this->normalizeProperties($properties);
 
         $event = Event::create($user->anonId(), $user->loginId(), $eventName)
-            ->withProperties(Properties::fromArray($properties->all()));
+            ->withProperties(Properties::fromArray($normalizedProperties->all()));
 
         $this->track($event);
     }
@@ -124,42 +125,53 @@ final class Client
     /**
      * 发送 profile set 事件。
      */
-    public function profileSet(User $user, Properties $properties): void
+    public function profileSet(User $user, array|Properties $properties): void
     {
         $this->validateUser($user);
-        $this->track(UserPropertyEventFactory::profileSet($user, $properties));
+        $this->track(UserPropertyEventFactory::profileSet($user, $this->normalizeProperties($properties)));
     }
 
     /**
      * 发送 profile set once 事件。
      */
-    public function profileSetOnce(User $user, Properties $properties): void
+    public function profileSetOnce(User $user, array|Properties $properties): void
     {
         $this->validateUser($user);
         $this->track(
-            $this->createUserPropertyEvent($user, $properties, Predefined::USER_SET_TYPE_SET_ONCE, 'setOnce')
+            $this->createUserPropertyEvent(
+                $user,
+                $this->normalizeProperties($properties),
+                Predefined::USER_SET_TYPE_SET_ONCE,
+                'setOnce'
+            )
         );
     }
 
     /**
      * 发送 profile increment 事件。
      */
-    public function profileIncrement(User $user, Properties $properties): void
+    public function profileIncrement(User $user, array|Properties $properties): void
     {
         $this->validateUser($user);
         $this->track(
-            $this->createUserPropertyEvent($user, $properties, Predefined::USER_SET_TYPE_INCREMENT, 'increment')
+            $this->createUserPropertyEvent(
+                $user,
+                $this->normalizeProperties($properties),
+                Predefined::USER_SET_TYPE_INCREMENT,
+                'increment'
+            )
         );
     }
 
     /**
      * 发送 profile append 事件。
      */
-    public function profileAppend(User $user, ListProperties $properties): void
+    public function profileAppend(User $user, array|ListProperties $properties): void
     {
         $this->validateUser($user);
+        $normalizedProperties = $this->normalizeListProperties($properties);
         $options = UserPropertyOptions::create();
-        foreach ($properties->all() as $key => $value) {
+        foreach ($normalizedProperties->all() as $key => $value) {
             $options->append($key, $value);
         }
         $this->track($this->buildUserPropertyEvent($user, $options, Predefined::USER_SET_TYPE_APPEND));
@@ -168,11 +180,12 @@ final class Client
     /**
      * 发送 profile union 事件。
      */
-    public function profileUnion(User $user, ListProperties $properties): void
+    public function profileUnion(User $user, array|ListProperties $properties): void
     {
         $this->validateUser($user);
+        $normalizedProperties = $this->normalizeListProperties($properties);
         $options = UserPropertyOptions::create();
-        foreach ($properties->all() as $key => $value) {
+        foreach ($normalizedProperties->all() as $key => $value) {
             $options->union($key, $value);
         }
         $this->track($this->buildUserPropertyEvent($user, $options, Predefined::USER_SET_TYPE_UNION));
@@ -353,6 +366,39 @@ final class Client
         return Event::create($user->anonId(), $user->loginId(), Predefined::EVENT_USER_SET)
             ->withUserPropertyOptions($options)
             ->withProperties(Properties::create()->set(Predefined::USER_SET_TYPE, $type));
+    }
+
+    /**
+     * 将数组或属性对象统一转成字典属性对象。
+     *
+     * @param array<string, mixed>|Properties $properties
+     */
+    private function normalizeProperties(array|Properties $properties): Properties
+    {
+        if ($properties instanceof Properties) {
+            return $properties;
+        }
+
+        return Properties::fromArray($properties);
+    }
+
+    /**
+     * 将数组或属性对象统一转成列表属性对象。
+     *
+     * @param array<string, mixed>|ListProperties $properties
+     */
+    private function normalizeListProperties(array|ListProperties $properties): ListProperties
+    {
+        if ($properties instanceof ListProperties) {
+            return $properties;
+        }
+
+        $normalized = ListProperties::create();
+        foreach ($properties as $key => $value) {
+            $normalized->set($key, is_array($value) ? array_values($value) : [$value]);
+        }
+
+        return $normalized;
     }
 
     /**

@@ -71,6 +71,46 @@ final class ClientTrackingTest extends TestCase
         self::assertSame('php', $payload[0]['properties']['$lib']);
     }
 
+    public function testTrackingApisAcceptPlainPhpArrays(): void
+    {
+        $transport = new FakeTransport();
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(transport: $transport)
+        );
+
+        $user = new User('anon-123', 'user-456');
+
+        $client->trackEvent($user, 'ArrayEvent', ['page_name' => '/pricing']);
+        $client->profileSet($user, ['plan' => 'pro']);
+        $client->profileSetOnce($user, ['first_plan' => 'starter']);
+        $client->profileIncrement($user, ['coins' => 3]);
+        $client->profileAppend($user, ['tags' => ['php', 'sdk']]);
+        $client->profileUnion($user, ['groups' => ['beta', 'beta', 'internal']]);
+
+        self::assertCount(6, $transport->requests);
+
+        $trackPayload = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('ArrayEvent', $trackPayload[0]['event']);
+        self::assertSame('/pricing', $trackPayload[0]['properties']['page_name']);
+
+        $setPayload = json_decode($transport->requests[1]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('pro', $setPayload[0]['user_properties']['$set']['plan']);
+
+        $setOncePayload = json_decode($transport->requests[2]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('starter', $setOncePayload[0]['user_properties']['$set_once']['first_plan']);
+
+        $incrementPayload = json_decode($transport->requests[3]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(3, $incrementPayload[0]['user_properties']['$increment']['coins']);
+
+        $appendPayload = json_decode($transport->requests[4]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(['php', 'sdk'], $appendPayload[0]['user_properties']['$append']['tags']);
+
+        $unionPayload = json_decode($transport->requests[5]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(['beta', 'internal'], $unionPayload[0]['user_properties']['$union']['groups']);
+    }
+
     public function testProfileSetSendsUserPropertyPayload(): void
     {
         $transport = new FakeTransport();
