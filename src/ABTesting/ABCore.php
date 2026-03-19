@@ -46,6 +46,24 @@ final class ABCore
     }
 
     /**
+     * 批量评估当前 storage 中的全部 spec。
+     *
+     * @return list<ABResult>
+     */
+    public function evaluateAll(User $user): array
+    {
+        $results = [];
+        foreach ($this->storage->allSpecs() as $spec) {
+            $result = $this->evaluateSpec($user, $spec);
+            if ($result->id > 0) {
+                $results[] = $result;
+            }
+        }
+
+        return $results;
+    }
+
+    /**
      * 导出当前 storage 快照。
      *
      * @throws JsonException

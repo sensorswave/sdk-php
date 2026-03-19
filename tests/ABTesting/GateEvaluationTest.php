@@ -263,4 +263,34 @@ final class GateEvaluationTest extends TestCase
             ABCore::TYPE_GATE
         )->checkFeatureGate());
     }
+
+    public function testEvaluateAllReturnsAllGateResultsIncludingFailures(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/multi_gates.json'
+        ));
+
+        $results = $core->evaluateAll(new User(
+            '',
+            'user5',
+            Properties::create()
+                ->set('$app_version', '10.5')
+                ->set('$country', 'JP')
+        ));
+
+        self::assertCount(3, $results);
+
+        $resultMap = [];
+        foreach ($results as $result) {
+            $resultMap[$result->key] = $result;
+        }
+
+        self::assertArrayHasKey('Gate_A', $resultMap);
+        self::assertArrayHasKey('Gate_B', $resultMap);
+        self::assertArrayHasKey('Gate_C', $resultMap);
+        self::assertTrue($resultMap['Gate_A']->checkFeatureGate());
+        self::assertTrue($resultMap['Gate_B']->checkFeatureGate());
+        self::assertFalse($resultMap['Gate_C']->checkFeatureGate());
+        self::assertSame('fail', $resultMap['Gate_C']->variantId);
+    }
 }
