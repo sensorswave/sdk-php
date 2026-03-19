@@ -56,4 +56,30 @@ final class ABResult
         $value = $this->variantParamValue[$key] ?? null;
         return is_bool($value) ? $value : $fallback;
     }
+
+    /**
+     * 读取列表参数。
+     *
+     * @param list<mixed> $fallback
+     *
+     * @return list<mixed>
+     */
+    public function getSlice(string $key, array $fallback): array
+    {
+        $value = $this->variantParamValue[$key] ?? null;
+        return is_array($value) && array_is_list($value) ? $value : $fallback;
+    }
+
+    /**
+     * 读取字典参数。
+     *
+     * @param array<string, mixed> $fallback
+     *
+     * @return array<string, mixed>
+     */
+    public function getMap(string $key, array $fallback): array
+    {
+        $value = $this->variantParamValue[$key] ?? null;
+        return is_array($value) && !array_is_list($value) ? $value : $fallback;
+    }
 }

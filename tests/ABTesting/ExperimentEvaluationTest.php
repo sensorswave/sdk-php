@@ -175,4 +175,73 @@ final class ExperimentEvaluationTest extends TestCase
 
         self::assertNotNull($holdoutUser);
     }
+
+    public function testExperimentTrafficRolloutCanExcludeUsers(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/exp/public.json'
+        ));
+
+        $inTraffic = null;
+        $outTraffic = null;
+        foreach (['user0', 'user1', 'user2', 'user3', 'user4', 'alice', 'bob', 'charlie', 'david', 'eve'] as $loginId) {
+            $result = $core->evaluate(new User('', $loginId), 'New_Experiment', ABCore::TYPE_EXPERIMENT);
+            if ($result->variantId !== null && $inTraffic === null) {
+                $inTraffic = $loginId;
+            }
+            if ($result->variantId === null && $outTraffic === null) {
+                $outTraffic = $loginId;
+            }
+            if ($inTraffic !== null && $outTraffic !== null) {
+                break;
+            }
+        }
+
+        self::assertNotNull($inTraffic);
+        self::assertNotNull($outTraffic);
+    }
+
+    public function testExperimentTargetRequiresMatchingVersion(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/exp/target.json'
+        ));
+
+        $blocked = $core->evaluate(
+            new User('', 'user1', Properties::create()->set('$app_version', '9.0')),
+            'TargetExperiment',
+            ABCore::TYPE_EXPERIMENT
+        );
+        self::assertNull($blocked->variantId);
+
+        $allowed = null;
+        foreach (['user0', 'user1', 'user2', 'user3', 'user4', 'user5'] as $loginId) {
+            $result = $core->evaluate(
+                new User('', $loginId, Properties::create()->set('$app_version', '10.0')),
+                'TargetExperiment',
+                ABCore::TYPE_EXPERIMENT
+            );
+            if ($result->variantId !== null) {
+                $allowed = $result;
+                break;
+            }
+        }
+
+        self::assertNotNull($allowed);
+        self::assertContains($allowed->variantId, ['v1', 'v2']);
+        self::assertContains($allowed->getNumber('test', -1), [0.0, 1.0]);
+    }
+
+    public function testExperimentReleaseOverridesAllUsersToVariantTwo(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/exp/release.json'
+        ));
+
+        foreach (['user1', 'user2', 'alice', 'bob'] as $loginId) {
+            $result = $core->evaluate(new User('', $loginId), 'TargetExperiment', ABCore::TYPE_EXPERIMENT);
+            self::assertSame('v2', $result->variantId);
+            self::assertSame(1.0, $result->getNumber('test', -1));
+        }
+    }
 }

@@ -84,4 +84,34 @@ final class ConfigEvaluationTest extends TestCase
         self::assertNotNull($fresh->variantId);
         self::assertArrayHasKey('27-sticky-config-new', $handler->data);
     }
+
+    public function testConfigTargetBlocksLowVersionAndAllowsQualifiedUsers(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/config/target.json'
+        ));
+
+        $blocked = $core->evaluate(
+            new User('', 'blocked', Properties::create()->set('$app_version', '10.0')),
+            'bMHsfOAUKx',
+            ABCore::TYPE_CONFIG
+        );
+        self::assertNull($blocked->variantId);
+
+        $allowed = null;
+        foreach (range(0, 50) as $index) {
+            $result = $core->evaluate(
+                new User('', 'config-target-user-' . $index, Properties::create()->set('$app_version', '10.1')),
+                'bMHsfOAUKx',
+                ABCore::TYPE_CONFIG
+            );
+            if ($result->variantId !== null) {
+                $allowed = $result;
+                break;
+            }
+        }
+
+        self::assertNotNull($allowed);
+        self::assertContains($allowed->getString('color', ''), ['blue', 'red', 'orange']);
+    }
 }
