@@ -42,6 +42,8 @@ $client->trackEvent(
     'PageView',
     ['page' => '/home'],
 );
+
+$client->close();
 ```
 
 ## User identity rules
@@ -54,6 +56,11 @@ If both IDs are present, the SDK uses `loginId` as the evaluation identity.
 For `identify`, you must provide both `anonId` and `loginId`.
 
 ## Event tracking API
+
+The tracking client buffers events in memory and flushes them as JSON arrays.
+The SDK flushes automatically when the batch reaches 50 events or when you
+call `close()`. In short-lived PHP processes, call `close()` before exit to
+drain the pending batch.
 
 The client currently supports these tracking methods:
 
@@ -71,6 +78,23 @@ The client currently supports these tracking methods:
 For PHP-first usage, you can pass plain arrays to all event and user property
 helpers. Use `Properties` or `ListProperties` only when you want the fluent
 builder API.
+
+### Retry and failure handling
+
+Tracking requests retry on transport errors and non-200 responses according to
+`httpRetry`.
+
+If the final attempt still fails, the SDK logs the failure and invokes
+`onTrackFailHandler`, if configured. The callback receives the decoded event
+batch, the thrown exception when present, and the final HTTP status code when
+available.
+
+Available tracking config fields include:
+
+- `trackUriPath`: tracking path, default `/in/track`
+- `flushIntervalMs`: opportunistic flush interval in milliseconds
+- `httpRetry`: retry count for tracking requests
+- `onTrackFailHandler`: failure callback for decoded event batches
 
 ## A/B testing
 

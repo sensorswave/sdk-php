@@ -32,6 +32,7 @@ final class ClientABTest extends TestCase
         );
 
         $passed = $client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec');
+        $client->close();
         self::assertTrue($passed);
         self::assertCount(1, $transport->requests);
     }
@@ -50,6 +51,7 @@ final class ClientABTest extends TestCase
             )
         );
         $configResult = $configClient->getFeatureConfig(new User('', 'config-public-user-1'), 'bMHsfOAUKx');
+        $configClient->close();
         self::assertNotNull($configResult->variantId);
         self::assertContains($configResult->getString('color', ''), ['blue', 'red', 'orange']);
 
@@ -64,6 +66,7 @@ final class ClientABTest extends TestCase
             )
         );
         $experimentResult = $experimentClient->getExperiment(new User('', 'user0'), 'New_Experiment');
+        $experimentClient->close();
         self::assertContains($experimentResult->variantId, ['v1', 'v2', null]);
     }
 
@@ -88,6 +91,7 @@ final class ClientABTest extends TestCase
                 ->set('$app_version', '10.5')
                 ->set('$country', 'JP')
         ));
+        $client->close();
 
         self::assertCount(3, $results);
 
@@ -100,15 +104,13 @@ final class ClientABTest extends TestCase
         self::assertTrue($resultMap['Gate_B']->checkFeatureGate());
         self::assertFalse($resultMap['Gate_C']->checkFeatureGate());
 
-        self::assertCount(3, $transport->requests);
+        self::assertCount(1, $transport->requests);
 
-        $payloads = array_map(
-            static fn (Request $request): array => json_decode($request->body, true, 512, JSON_THROW_ON_ERROR),
-            $transport->requests
-        );
-        self::assertSame('$FeatureImpress', $payloads[0][0]['event']);
-        self::assertSame('$FeatureImpress', $payloads[1][0]['event']);
-        self::assertSame('$FeatureImpress', $payloads[2][0]['event']);
+        $payloads = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertCount(3, $payloads);
+        self::assertSame('$FeatureImpress', $payloads[0]['event']);
+        self::assertSame('$FeatureImpress', $payloads[1]['event']);
+        self::assertSame('$FeatureImpress', $payloads[2]['event']);
     }
 
     public function testClientCanLoadRemoteMetaWithCustomEndpointAndPath(): void
@@ -148,8 +150,10 @@ final class ClientABTest extends TestCase
         );
 
         $passed = $client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec');
+        $client->close();
 
         self::assertTrue($passed);
+        self::assertCount(2, $transport->requests);
         self::assertSame('GET', $transport->requests[0]->method);
         self::assertSame('http://example.com/custom/path', $transport->requests[0]->url);
         self::assertSame('test-token', $transport->requests[0]->headers['SourceToken'] ?? null);
@@ -192,8 +196,10 @@ final class ClientABTest extends TestCase
         );
 
         $passed = $client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec');
+        $client->close();
 
         self::assertTrue($passed);
+        self::assertCount(2, $transport->requests);
         self::assertSame('http://example.com/ab/all4eval', $transport->requests[0]->url);
     }
 
@@ -232,8 +238,10 @@ final class ClientABTest extends TestCase
         );
 
         $passed = $client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec');
+        $client->close();
 
         self::assertTrue($passed);
+        self::assertCount(2, $transport->requests);
         self::assertSame('http://example.com/ab/all4eval', $transport->requests[0]->url);
     }
 
@@ -268,6 +276,7 @@ final class ClientABTest extends TestCase
         );
 
         self::assertTrue($warmClient->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        $warmClient->close();
     }
 
     public function testClientCanInitializeFromRemoteMetaWithoutSpecs(): void
@@ -437,6 +446,7 @@ final class ClientABTest extends TestCase
         self::assertFalse($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
         usleep(20_000);
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        $client->close();
 
         $getRequests = array_values(array_filter(
             $transport->requests,
@@ -496,6 +506,7 @@ final class ClientABTest extends TestCase
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
         usleep(20_000);
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        $client->close();
 
         $getRequests = array_values(array_filter(
             $transport->requests,
@@ -571,6 +582,7 @@ final class ClientABTest extends TestCase
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
         usleep(20_000);
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        $client->close();
         self::assertCount(1, $logger->errors);
         self::assertStringContainsString('ab meta refresh failed', $logger->errors[0]);
     }

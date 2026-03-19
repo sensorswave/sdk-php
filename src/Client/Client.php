@@ -35,6 +35,8 @@ final class Client
     public const AB_TYPE_GATE = 1;
     public const AB_TYPE_CONFIG = 2;
     public const AB_TYPE_EXPERIMENT = 3;
+    private const MAX_BATCH_SIZE = 50;
+    private const MAX_HTTP_BODY_SIZE = 5 * 1024 * 1024;
 
     private bool $closed = false;
     private readonly TransportInterface $transport;
@@ -44,6 +46,10 @@ final class Client
     private int $metaLoadIntervalMs = 0;
     private ?int $lastMetaLoadAtMs = null;
     private readonly ?\SensorsWave\Contract\StickyHandlerInterface $stickyHandler;
+    /** @var list<string> */
+    private array $pendingMessages = [];
+    private int $pendingBodySize = 0;
+    private ?int $lastTrackFlushAtMs = null;
 
     private function __construct(
         string $endpoint,
@@ -69,6 +75,11 @@ final class Client
      */
     public function close(): void
     {
+        if ($this->closed) {
+            return;
+        }
+
+        $this->flushPendingTrackMessages();
         $this->closed = true;
     }
 
@@ -108,8 +119,8 @@ final class Client
         }
 
         $event->normalize();
-        $body = EventSerializer::serializeBatch([$event]);
-        $this->sendTrackRequest($body);
+        $this->flushPendingTrackMessagesIfDue();
+        $this->enqueueTrackMessage(EventSerializer::serialize($event));
     }
 
     /**
@@ -453,6 +464,50 @@ final class Client
         }
 
         ($this->config->onTrackFailHandler)($events, $error, $statusCode);
+    }
+
+    /**
+     * 将单条事件消息放入待发送队列。
+     */
+    private function enqueueTrackMessage(string $message): void
+    {
+        $this->pendingMessages[] = $message;
+        $this->pendingBodySize += strlen($message);
+
+        if (count($this->pendingMessages) >= self::MAX_BATCH_SIZE || $this->pendingBodySize >= self::MAX_HTTP_BODY_SIZE) {
+            $this->flushPendingTrackMessages();
+        }
+    }
+
+    /**
+     * 在队列 flush 间隔到期时发送积压事件。
+     */
+    private function flushPendingTrackMessagesIfDue(): void
+    {
+        if ($this->config->flushIntervalMs <= 0 || $this->lastTrackFlushAtMs === null) {
+            return;
+        }
+
+        if ($this->nowMs() - $this->lastTrackFlushAtMs >= $this->config->flushIntervalMs) {
+            $this->flushPendingTrackMessages();
+        }
+    }
+
+    /**
+     * 将待发送事件批量刷出。
+     */
+    private function flushPendingTrackMessages(): void
+    {
+        if ($this->pendingMessages === []) {
+            return;
+        }
+
+        $body = '[' . implode(',', $this->pendingMessages) . ']';
+        $this->pendingMessages = [];
+        $this->pendingBodySize = 0;
+        $this->lastTrackFlushAtMs = $this->nowMs();
+
+        $this->sendTrackRequest($body);
     }
 
     /**

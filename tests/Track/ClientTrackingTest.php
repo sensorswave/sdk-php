@@ -29,6 +29,7 @@ final class ClientTrackingTest extends TestCase
         );
 
         $client->identify(new User('anon-123', 'user-456'));
+        $client->close();
 
         self::assertCount(1, $transport->requests);
         self::assertSame('POST', $transport->requests[0]->method);
@@ -68,6 +69,7 @@ final class ClientTrackingTest extends TestCase
             'PageView',
             Properties::create()->set('page_name', '/home')
         );
+        $client->close();
 
         $payload = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('PageView', $payload[0]['event']);
@@ -92,27 +94,24 @@ final class ClientTrackingTest extends TestCase
         $client->profileIncrement($user, ['coins' => 3]);
         $client->profileAppend($user, ['tags' => ['php', 'sdk']]);
         $client->profileUnion($user, ['groups' => ['beta', 'beta', 'internal']]);
+        $client->close();
 
-        self::assertCount(6, $transport->requests);
+        self::assertCount(1, $transport->requests);
 
-        $trackPayload = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame('ArrayEvent', $trackPayload[0]['event']);
-        self::assertSame('/pricing', $trackPayload[0]['properties']['page_name']);
+        $payloads = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertCount(6, $payloads);
+        self::assertSame('ArrayEvent', $payloads[0]['event']);
+        self::assertSame('/pricing', $payloads[0]['properties']['page_name']);
 
-        $setPayload = json_decode($transport->requests[1]->body, true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame('pro', $setPayload[0]['user_properties']['$set']['plan']);
+        self::assertSame('pro', $payloads[1]['user_properties']['$set']['plan']);
 
-        $setOncePayload = json_decode($transport->requests[2]->body, true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame('starter', $setOncePayload[0]['user_properties']['$set_once']['first_plan']);
+        self::assertSame('starter', $payloads[2]['user_properties']['$set_once']['first_plan']);
 
-        $incrementPayload = json_decode($transport->requests[3]->body, true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame(3, $incrementPayload[0]['user_properties']['$increment']['coins']);
+        self::assertSame(3, $payloads[3]['user_properties']['$increment']['coins']);
 
-        $appendPayload = json_decode($transport->requests[4]->body, true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame(['php', 'sdk'], $appendPayload[0]['user_properties']['$append']['tags']);
+        self::assertSame(['php', 'sdk'], $payloads[4]['user_properties']['$append']['tags']);
 
-        $unionPayload = json_decode($transport->requests[5]->body, true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame(['beta', 'internal'], $unionPayload[0]['user_properties']['$union']['groups']);
+        self::assertSame(['beta', 'internal'], $payloads[5]['user_properties']['$union']['groups']);
     }
 
     public function testProfileSetSendsUserPropertyPayload(): void
@@ -128,6 +127,7 @@ final class ClientTrackingTest extends TestCase
             new User('anon-123', 'user-456'),
             Properties::create()->set('plan', 'pro')
         );
+        $client->close();
 
         $payload = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('$UserSet', $payload[0]['event']);
@@ -178,6 +178,7 @@ final class ClientTrackingTest extends TestCase
         );
 
         $client->trackEvent(new User('anon-123', 'user-456'), 'RetryEvent', ['page' => '/retry']);
+        $client->close();
 
         self::assertCount(3, $transport->requests);
         self::assertIsArray($failedEvents);
@@ -216,6 +217,7 @@ final class ClientTrackingTest extends TestCase
         );
 
         $client->trackEvent(new User('anon-123', 'user-456'), 'RetryExceptionEvent', ['page' => '/retry-ex']);
+        $client->close();
 
         self::assertSame(2, $transport->attempts);
         self::assertIsArray($failedEvents);
@@ -255,8 +257,59 @@ final class ClientTrackingTest extends TestCase
         );
 
         $client->trackEvent(new User('anon-123', 'user-456'), 'RetrySuccessEvent', ['page' => '/ok']);
+        $client->close();
 
         self::assertSame(2, $transport->attempts);
         self::assertFalse($invoked);
+    }
+
+    public function testCloseFlushesBufferedEventsInSingleBatch(): void
+    {
+        $transport = new FakeTransport();
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(transport: $transport)
+        );
+
+        $client->trackEvent(new User('anon-1', 'user-1'), 'BufferedOne', ['step' => 1]);
+        $client->trackEvent(new User('anon-2', 'user-2'), 'BufferedTwo', ['step' => 2]);
+
+        self::assertCount(0, $transport->requests);
+
+        $client->close();
+
+        self::assertCount(1, $transport->requests);
+        $payload = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertCount(2, $payload);
+        self::assertSame('BufferedOne', $payload[0]['event']);
+        self::assertSame('BufferedTwo', $payload[1]['event']);
+    }
+
+    public function testTrackFlushesWhenBatchReachesFiftyEvents(): void
+    {
+        $transport = new FakeTransport();
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(transport: $transport)
+        );
+
+        for ($index = 1; $index <= 50; $index++) {
+            $client->trackEvent(
+                new User('anon-' . $index, 'user-' . $index),
+                'BatchEvent' . $index,
+                ['index' => $index]
+            );
+        }
+
+        self::assertCount(1, $transport->requests);
+        $payload = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertCount(50, $payload);
+        self::assertSame('BatchEvent1', $payload[0]['event']);
+        self::assertSame('BatchEvent50', $payload[49]['event']);
+
+        $client->close();
+        self::assertCount(1, $transport->requests);
     }
 }
