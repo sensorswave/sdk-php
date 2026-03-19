@@ -14,14 +14,12 @@ use SensorsWave\ABTesting\Model\ABSpec;
 final class StorageFactory
 {
     /**
-     * 从 JSON 字符串创建 storage。
+     * 从数组创建 storage。
      *
-     * @throws JsonException
+     * @param array<string, mixed> $payload
      */
-    public static function fromJson(string $json): Storage
+    public static function fromArray(array $payload): Storage
     {
-        /** @var array<string, mixed> $payload */
-        $payload = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         /** @var array<string, mixed> $data */
         $data = isset($payload['data']) && is_array($payload['data'])
             ? $payload['data']
@@ -43,5 +41,18 @@ final class StorageFactory
             ABEnv::fromArray((array) ($data['ab_env'] ?? $data['ABEnv'] ?? [])),
             $specs,
         );
+    }
+
+    /**
+     * 从 JSON 字符串创建 storage。
+     *
+     * @throws JsonException
+     */
+    public static function fromJson(string $json): Storage
+    {
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
+        return self::fromArray($payload);
     }
 }

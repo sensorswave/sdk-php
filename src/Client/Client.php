@@ -38,7 +38,11 @@ final class Client
     private bool $closed = false;
     private readonly TransportInterface $transport;
     private readonly string $normalizedEndpoint;
-    private readonly ?ABCore $abCore;
+    private ?ABCore $abCore = null;
+    private ?HttpSignatureMetaLoader $metaLoader = null;
+    private int $metaLoadIntervalMs = 0;
+    private ?int $lastMetaLoadAtMs = null;
+    private readonly ?\SensorsWave\Contract\StickyHandlerInterface $stickyHandler;
 
     private function __construct(
         string $endpoint,
@@ -47,6 +51,7 @@ final class Client
     ) {
         $this->normalizedEndpoint = self::normalizeEndpoint($endpoint);
         $this->transport = $config->transport ?? new HttpClient();
+        $this->stickyHandler = $config->ab?->stickyHandler;
         $this->abCore = $this->buildABCore($config);
     }
 
@@ -207,6 +212,7 @@ final class Client
     public function checkFeatureGate(User $user, string $key): bool
     {
         $this->validateUser($user);
+        $this->ensureABCoreFresh();
         $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_GATE);
         if (!$result->disableImpress && $result->key !== '') {
             $this->track(ABImpressionFactory::create($user, $result));
@@ -221,6 +227,7 @@ final class Client
     public function getFeatureConfig(User $user, string $key): ABResult
     {
         $this->validateUser($user);
+        $this->ensureABCoreFresh();
         $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_CONFIG);
         if (!$result->disableImpress && $result->key !== '') {
             $this->track(ABImpressionFactory::create($user, $result));
@@ -235,6 +242,7 @@ final class Client
     public function getExperiment(User $user, string $key): ABResult
     {
         $this->validateUser($user);
+        $this->ensureABCoreFresh();
         $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_EXPERIMENT);
         if (!$result->disableImpress && $result->key !== '') {
             $this->track(ABImpressionFactory::create($user, $result));
@@ -248,6 +256,7 @@ final class Client
      */
     public function getABSpecs(): string
     {
+        $this->ensureABCoreFresh();
         return $this->requireABCore()->getABSpecs();
     }
 
@@ -270,39 +279,41 @@ final class Client
             return null;
         }
 
+        $storage = null;
         if ($config->ab->loadABSpecs !== '') {
             try {
-                return new ABCore(
-                    StorageFactory::fromJson($config->ab->loadABSpecs),
-                    $config->ab->stickyHandler
-                );
+                $storage = StorageFactory::fromJson($config->ab->loadABSpecs);
+                $this->lastMetaLoadAtMs = $this->nowMs();
             } catch (JsonException) {
-                return null;
+                $storage = null;
             }
         }
 
-        if ($config->ab->projectSecret === '') {
-            return null;
-        }
+        if ($config->ab->projectSecret !== '') {
+            $metaEndpoint = $config->ab->metaEndpoint !== ''
+                ? self::normalizeEndpoint($config->ab->metaEndpoint)
+                : $this->normalizedEndpoint;
+            $metaUriPath = self::normalizeUriPath($config->ab->metaUriPath, '/ab/all4eval');
 
-        $metaEndpoint = $config->ab->metaEndpoint !== ''
-            ? self::normalizeEndpoint($config->ab->metaEndpoint)
-            : $this->normalizedEndpoint;
-        $metaUriPath = self::normalizeUriPath($config->ab->metaUriPath, '/ab/all4eval');
-
-        try {
-            $storage = (new HttpSignatureMetaLoader(
+            $this->metaLoader = new HttpSignatureMetaLoader(
                 endpoint: $metaEndpoint,
                 uriPath: $metaUriPath,
                 sourceToken: $this->sourceToken,
                 projectSecret: $config->ab->projectSecret,
                 transport: $this->transport,
-            ))->load();
+            );
+            $this->metaLoadIntervalMs = max(0, $config->ab->metaLoadIntervalMs);
+        }
 
-            return new ABCore($storage, $config->ab->stickyHandler);
-        } catch (JsonException|\RuntimeException|\InvalidArgumentException) {
+        if ($storage !== null) {
+            return new ABCore($storage, $this->stickyHandler);
+        }
+
+        if ($this->metaLoader === null) {
             return null;
         }
+
+        return $this->refreshABCore(true);
     }
 
     /**
@@ -377,5 +388,58 @@ final class Client
         }
 
         return str_starts_with($uriPath, '/') ? $uriPath : '/' . $uriPath;
+    }
+
+    /**
+     * 在下次求值前按需刷新远程 meta。
+     */
+    private function ensureABCoreFresh(): void
+    {
+        if ($this->metaLoader === null || $this->metaLoadIntervalMs === 0) {
+            return;
+        }
+
+        if ($this->lastMetaLoadAtMs !== null && $this->nowMs() - $this->lastMetaLoadAtMs < $this->metaLoadIntervalMs) {
+            return;
+        }
+
+        $this->refreshABCore(false);
+    }
+
+    /**
+     * 刷新 A/B core。
+     */
+    private function refreshABCore(bool $forceInitialize): ?ABCore
+    {
+        if ($this->metaLoader === null) {
+            return $this->abCore;
+        }
+
+        try {
+            $result = $this->metaLoader->loadResult();
+            $this->lastMetaLoadAtMs = $this->nowMs();
+
+            if ($this->abCore === null) {
+                $this->abCore = new ABCore($result->storage, $this->stickyHandler);
+                return $this->abCore;
+            }
+
+            if (!$result->update && $this->abCore->storageUpdateTime() === $result->storage->updateTime) {
+                return $this->abCore;
+            }
+
+            $this->abCore->replaceStorage($result->storage);
+            return $this->abCore;
+        } catch (JsonException|\RuntimeException|\InvalidArgumentException) {
+            return $forceInitialize ? null : $this->abCore;
+        }
+    }
+
+    /**
+     * 当前时间戳（毫秒）。
+     */
+    private function nowMs(): int
+    {
+        return (int) floor(microtime(true) * 1000);
     }
 }

@@ -22,7 +22,7 @@ final class ABCore
     public const TYPE_EXPERIMENT = 3;
 
     public function __construct(
-        private readonly Storage $storage,
+        private Storage $storage,
         private readonly ?StickyHandlerInterface $stickyHandler = null,
     )
     {
@@ -53,6 +53,22 @@ final class ABCore
     public function getABSpecs(): string
     {
         return json_encode($this->storage->toPayload(), JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * 替换当前 storage。
+     */
+    public function replaceStorage(Storage $storage): void
+    {
+        $this->storage = $storage;
+    }
+
+    /**
+     * 返回当前 storage 的更新时间。
+     */
+    public function storageUpdateTime(): int
+    {
+        return $this->storage->updateTime;
     }
 
     /**

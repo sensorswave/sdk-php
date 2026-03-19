@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\Tests\ABTesting;
 
 use PHPUnit\Framework\TestCase;
+use InvalidArgumentException;
 use SensorsWave\Client\Client;
 use SensorsWave\Config\ABConfig;
 use SensorsWave\Config\Config;
@@ -223,5 +224,189 @@ final class ClientABTest extends TestCase
         );
 
         self::assertTrue($warmClient->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+    }
+
+    public function testClientCanInitializeFromRemoteMetaWithoutSpecs(): void
+    {
+        $transport = new class implements TransportInterface {
+            /** @var list<Request> */
+            public array $requests = [];
+
+            public function send(Request $request): Response
+            {
+                $this->requests[] = $request;
+
+                if ($request->method === 'GET') {
+                    return new Response(
+                        200,
+                        json_encode([
+                            'code' => 0,
+                            'data' => [
+                                'update' => true,
+                                'update_time' => 11,
+                                'ab_env' => [],
+                                'ab_specs' => [],
+                            ],
+                        ], JSON_THROW_ON_ERROR)
+                    );
+                }
+
+                return new Response(200, '{}');
+            }
+        };
+
+        $client = Client::create(
+            'http://example.com',
+            'test-token',
+            new Config(
+                transport: $transport,
+                ab: new ABConfig(projectSecret: 'secret')
+            )
+        );
+
+        self::assertFalse($client->checkFeatureGate(new User('', 'user-pass'), 'missing_key'));
+        self::assertCount(1, $transport->requests);
+        self::assertSame('GET', $transport->requests[0]->method);
+    }
+
+    public function testClientLeavesABCoreUninitializedWhenRemoteMetaFails(): void
+    {
+        $transport = new class implements TransportInterface {
+            public function send(Request $request): Response
+            {
+                return new Response(500, '{"msg":"fail"}');
+            }
+        };
+
+        $client = Client::create(
+            'http://example.com',
+            'test-token',
+            new Config(
+                transport: $transport,
+                ab: new ABConfig(projectSecret: 'secret')
+            )
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('ab core not initialized');
+        $client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec');
+    }
+
+    public function testClientRefreshesRemoteMetaOnNextEvaluationAfterInterval(): void
+    {
+        $firstPayload = json_encode([
+            'code' => 0,
+            'data' => [
+                'update' => true,
+                'update_time' => 1,
+                'ab_specs' => [],
+            ],
+        ], JSON_THROW_ON_ERROR);
+        $secondPayload = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
+
+        $transport = new class ($firstPayload, $secondPayload) implements TransportInterface {
+            /** @var list<Request> */
+            public array $requests = [];
+            private int $getCalls = 0;
+
+            public function __construct(
+                private readonly string $firstPayload,
+                private readonly string $secondPayload,
+            ) {
+            }
+
+            public function send(Request $request): Response
+            {
+                $this->requests[] = $request;
+
+                if ($request->method === 'GET') {
+                    $this->getCalls++;
+                    return new Response(200, $this->getCalls === 1 ? $this->firstPayload : $this->secondPayload);
+                }
+
+                return new Response(200, '{}');
+            }
+        };
+
+        $client = Client::create(
+            'http://example.com',
+            'test-token',
+            new Config(
+                transport: $transport,
+                ab: new ABConfig(
+                    projectSecret: 'secret',
+                    metaLoadIntervalMs: 10,
+                )
+            )
+        );
+
+        self::assertFalse($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        usleep(20_000);
+        self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+
+        $getRequests = array_values(array_filter(
+            $transport->requests,
+            static fn (Request $request): bool => $request->method === 'GET'
+        ));
+        self::assertCount(2, $getRequests);
+    }
+
+    public function testClientKeepsExistingStorageWhenRefreshSaysNoUpdate(): void
+    {
+        $initialPayload = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
+        $secondPayload = json_encode([
+            'code' => 0,
+            'data' => [
+                'update' => false,
+                'update_time' => 1763391230637,
+                'ab_specs' => [],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $transport = new class ($initialPayload, $secondPayload) implements TransportInterface {
+            /** @var list<Request> */
+            public array $requests = [];
+            private int $getCalls = 0;
+
+            public function __construct(
+                private readonly string $initialPayload,
+                private readonly string $secondPayload,
+            ) {
+            }
+
+            public function send(Request $request): Response
+            {
+                $this->requests[] = $request;
+
+                if ($request->method === 'GET') {
+                    $this->getCalls++;
+                    return new Response(200, $this->getCalls === 1 ? $this->initialPayload : $this->secondPayload);
+                }
+
+                return new Response(200, '{}');
+            }
+        };
+
+        $client = Client::create(
+            'http://example.com',
+            'test-token',
+            new Config(
+                transport: $transport,
+                ab: new ABConfig(
+                    projectSecret: 'secret',
+                    metaLoadIntervalMs: 10,
+                )
+            )
+        );
+
+        self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        usleep(20_000);
+        self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+
+        $getRequests = array_values(array_filter(
+            $transport->requests,
+            static fn (Request $request): bool => $request->method === 'GET'
+        ));
+        self::assertCount(2, $getRequests);
     }
 }

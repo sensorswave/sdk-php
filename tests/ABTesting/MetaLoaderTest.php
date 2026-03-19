@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\Tests\ABTesting;
 
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use SensorsWave\ABTesting\HttpSignatureMetaLoader;
 use SensorsWave\Http\Request;
 use SensorsWave\Http\Response;
@@ -104,5 +105,52 @@ final class MetaLoaderTest extends TestCase
         $variantValue = $spec->variantValues[1];
         self::assertArrayHasKey('color', $variantValue);
         self::assertSame('blue', $variantValue['color']);
+    }
+
+    public function testMetaLoaderThrowsOnHttpError(): void
+    {
+        $transport = new class implements TransportInterface {
+            public function send(Request $request): Response
+            {
+                return new Response(500, '{"msg":"fail"}');
+            }
+        };
+
+        $loader = new HttpSignatureMetaLoader(
+            endpoint: 'http://example.com',
+            uriPath: '/ab/all4eval',
+            sourceToken: 'token',
+            projectSecret: 'secret',
+            transport: $transport,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('httpcode: 500');
+        $loader->load();
+    }
+
+    public function testMetaLoaderThrowsOnInvalidPayload(): void
+    {
+        $transport = new class implements TransportInterface {
+            public function send(Request $request): Response
+            {
+                return new Response(
+                    200,
+                    '{"code":0,"data":{"update":true,"update_time":9,"ab_specs":[{"id":2,"key":"bad_ff","variant_payloads":{"1":{invalid}}}]}}'
+                );
+            }
+        };
+
+        $loader = new HttpSignatureMetaLoader(
+            endpoint: 'http://example.com',
+            uriPath: '/ab/all4eval',
+            sourceToken: 'token',
+            projectSecret: 'secret',
+            transport: $transport,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('unmarshal failed');
+        $loader->load();
     }
 }

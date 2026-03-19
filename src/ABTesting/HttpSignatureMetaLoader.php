@@ -34,6 +34,14 @@ final class HttpSignatureMetaLoader
      */
     public function load(): Storage
     {
+        return $this->loadResult()->storage;
+    }
+
+    /**
+     * 拉取并解析远程 A/B 元数据结果。
+     */
+    public function loadResult(): MetaLoadResult
+    {
         [$requestUri, $queryString] = $this->splitUriPath($this->uriPath);
 
         $headers = [
@@ -66,7 +74,17 @@ final class HttpSignatureMetaLoader
         }
 
         try {
-            return StorageFactory::fromJson($response->body);
+            /** @var array<string, mixed> $payload */
+            $payload = json_decode($response->body, true, 512, JSON_THROW_ON_ERROR);
+            /** @var array<string, mixed> $data */
+            $data = isset($payload['data']) && is_array($payload['data'])
+                ? $payload['data']
+                : $payload;
+
+            return new MetaLoadResult(
+                (bool) ($data['update'] ?? true),
+                StorageFactory::fromArray($payload)
+            );
         } catch (JsonException $exception) {
             throw new RuntimeException('unmarshal failed: ' . $exception->getMessage(), 0, $exception);
         }
