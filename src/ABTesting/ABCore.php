@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace SensorsWave\ABTesting;
 
 use DateTimeImmutable;
+use JsonException;
 use SensorsWave\ABTesting\Model\ABSpec;
 use SensorsWave\ABTesting\Model\Condition;
 use SensorsWave\ABTesting\Model\Rule;
+use SensorsWave\Contract\StickyHandlerInterface;
 use SensorsWave\Model\User;
 
 /**
@@ -19,7 +21,10 @@ final class ABCore
     public const TYPE_CONFIG = 2;
     public const TYPE_EXPERIMENT = 3;
 
-    public function __construct(private readonly Storage $storage)
+    public function __construct(
+        private readonly Storage $storage,
+        private readonly ?StickyHandlerInterface $stickyHandler = null,
+    )
     {
     }
 
@@ -38,6 +43,16 @@ final class ABCore
         }
 
         return $this->evaluateSpec($user, $spec);
+    }
+
+    /**
+     * 导出当前 storage 快照。
+     *
+     * @throws JsonException
+     */
+    public function getABSpecs(): string
+    {
+        return json_encode($this->storage->toPayload(), JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -60,6 +75,22 @@ final class ABCore
             type: $spec->type,
             disableImpress: $spec->disableImpress,
         );
+        $stickyKey = null;
+
+        if ($spec->sticky && $this->stickyHandler !== null) {
+            $stickyKey = $spec->id . '-' . $evalId;
+            $cached = $this->stickyHandler->getStickyResult($stickyKey);
+            if (is_string($cached) && $cached !== '') {
+                /** @var array<string, mixed> $decoded */
+                $decoded = json_decode($cached, true) ?? [];
+                $variantId = $decoded['v'] ?? null;
+                if (is_string($variantId)) {
+                    $result->variantId = $variantId;
+                    $result->variantParamValue = $spec->variantValues[$variantId] ?? [];
+                    return $result;
+                }
+            }
+        }
 
         $pass = false;
         if ($this->evaluateOverrideRules($user, $spec, $evalId, $result)) {
@@ -78,7 +109,12 @@ final class ABCore
             $this->evaluateGroupRules($user, $spec, $evalId, $result);
         }
 
-        return $this->finalizeGateResult($spec, $result, $pass);
+        $result = $this->finalizeGateResult($spec, $result, $pass);
+        if ($stickyKey !== null && $result->variantId !== null) {
+            $this->stickyHandler?->setStickyResult($stickyKey, json_encode(['v' => $result->variantId], JSON_THROW_ON_ERROR));
+        }
+
+        return $result;
     }
 
     /**
@@ -190,6 +226,7 @@ final class ABCore
             'common' => strtolower($condition->field) === 'public' ? true : null,
             'ffuser' => $this->ffUserValue($user, $condition->field),
             'props' => $user->abUserProperties()->get($condition->field),
+            'bucket' => $condition->field,
             'target' => null,
             default => $condition->field,
         };
@@ -218,6 +255,9 @@ final class ABCore
             'neq' => !$this->deepEqual($left, $condition->value),
             'before' => $this->compareTimes($left, $condition->value, static fn (int $cmp): bool => $cmp < 0),
             'after' => $this->compareTimes($left, $condition->value, static fn (int $cmp): bool => $cmp > 0),
+            'bucket_set' => is_string($left) && is_string($condition->value) ? $this->bucketSetContains($evalId, $left, $condition->value) : false,
+            'gate_pass' => $this->evaluateGateDependency($user, $condition->field, false),
+            'gate_fail' => $this->evaluateGateDependency($user, $condition->field, true),
             default => false,
         };
     }
@@ -341,6 +381,38 @@ final class ABCore
     }
 
     /**
+     * 执行 gate 依赖判断。
+     */
+    private function evaluateGateDependency(User $user, string $key, bool $invert): bool
+    {
+        $result = $this->evaluate($user, $key, self::TYPE_GATE);
+        $pass = $result->checkFeatureGate();
+
+        return $invert ? !$pass : $pass;
+    }
+
+    /**
+     * 判断 BUCKET_SET 是否包含当前用户桶位。
+     */
+    private function bucketSetContains(string $evalId, string $salt, string $encodedBitmap): bool
+    {
+        $bitmap = @hex2bin($encodedBitmap);
+        if ($bitmap === false) {
+            return false;
+        }
+
+        $bucket = $this->hashModulo($evalId, $salt, 1000);
+        $byteIndex = intdiv($bucket, 8);
+        $bitIndex = $bucket % 8;
+        if (!isset($bitmap[$byteIndex])) {
+            return false;
+        }
+
+        $byte = ord($bitmap[$byteIndex]);
+        return (($byte >> (7 - $bitIndex)) & 1) === 1;
+    }
+
+    /**
      * 将任意值转换为字符串。
      */
     private function stringify(mixed $value): string
@@ -383,7 +455,8 @@ final class ABCore
      */
     private function splitVersion(string $value): ?array
     {
-        $version = explode('-', $value)[0] ?? '';
+        $segments = explode('-', $value, 2);
+        $version = $segments[0];
         if ($version === '') {
             return null;
         }

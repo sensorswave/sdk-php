@@ -55,6 +55,6 @@ final class CanonicalRequestBuilder
         );
         sort($keys);
 
-        return array_values($keys);
+        return $keys;
     }
 }

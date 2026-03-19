@@ -1,0 +1,108 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SensorsWave\Tests\ABTesting;
+
+use PHPUnit\Framework\TestCase;
+use SensorsWave\ABTesting\HttpSignatureMetaLoader;
+use SensorsWave\Http\Request;
+use SensorsWave\Http\Response;
+use SensorsWave\Http\TransportInterface;
+
+final class MetaLoaderTest extends TestCase
+{
+    public function testMetaLoaderUsesUriPathAndSignsRequest(): void
+    {
+        $transport = new class implements TransportInterface {
+            public ?Request $lastRequest = null;
+
+            public function send(Request $request): Response
+            {
+                $this->lastRequest = $request;
+
+                return new Response(
+                    200,
+                    json_encode([
+                        'code' => 0,
+                        'data' => [
+                            'update' => true,
+                            'update_time' => 123,
+                            'ab_specs' => [],
+                        ],
+                    ], JSON_THROW_ON_ERROR)
+                );
+            }
+        };
+
+        $loader = new HttpSignatureMetaLoader(
+            endpoint: 'http://example.com',
+            uriPath: '/ab/all4eval',
+            sourceToken: 'token',
+            projectSecret: 'secret',
+            transport: $transport,
+        );
+
+        $storage = $loader->load();
+
+        self::assertNotNull($transport->lastRequest);
+        self::assertSame('GET', $transport->lastRequest->method);
+        self::assertSame('http://example.com/ab/all4eval', $transport->lastRequest->url);
+        self::assertSame('token', $transport->lastRequest->headers['SourceToken'] ?? null);
+        self::assertSame('php', $transport->lastRequest->headers['X-SDK'] ?? null);
+        self::assertStringContainsString('ACS3-HMAC-SHA256', $transport->lastRequest->headers['Authorization'] ?? '');
+        self::assertSame(123, $storage->updateTime);
+    }
+
+    public function testMetaLoaderParsesVariantPayloads(): void
+    {
+        $transport = new class implements TransportInterface {
+            public function send(Request $request): Response
+            {
+                return new Response(
+                    200,
+                    json_encode([
+                        'code' => 0,
+                        'data' => [
+                            'update' => true,
+                            'update_time' => 123,
+                            'ab_specs' => [[
+                                'id' => 9,
+                                'key' => 'remote_ff',
+                                'name' => 'Remote FF',
+                                'typ' => 3,
+                                'subject_id' => 'LOGIN_ID',
+                                'enabled' => true,
+                                'sticky' => false,
+                                'rules' => [],
+                                'variant_payloads' => [
+                                    '1' => ['color' => 'blue'],
+                                ],
+                            ]],
+                        ],
+                    ], JSON_THROW_ON_ERROR)
+                );
+            }
+        };
+
+        $loader = new HttpSignatureMetaLoader(
+            endpoint: 'http://example.com/api',
+            uriPath: '/custom/path',
+            sourceToken: 'token',
+            projectSecret: 'secret',
+            transport: $transport,
+        );
+
+        $storage = $loader->load();
+        $spec = $storage->getSpec('remote_ff');
+
+        self::assertNotNull($spec);
+        if (!array_key_exists(1, $spec->variantValues)) {
+            self::fail('variant payload 1 should exist');
+        }
+
+        $variantValue = $spec->variantValues[1];
+        self::assertArrayHasKey('color', $variantValue);
+        self::assertSame('blue', $variantValue['color']);
+    }
+}

@@ -50,4 +50,24 @@ final class Rule
             $override,
         );
     }
+
+    /**
+     * 导出为数组。
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'name' => $this->name,
+            'id' => $this->id,
+            'salt' => $this->salt,
+            'rollout' => $this->rollout,
+            'conditions' => array_map(
+                static fn (Condition $condition): array => $condition->toArray(),
+                $this->conditions
+            ),
+            'override' => $this->override,
+        ];
+    }
 }

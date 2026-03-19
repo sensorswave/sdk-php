@@ -31,4 +31,19 @@ final class Condition
             $data['value'] ?? null,
         );
     }
+
+    /**
+     * 导出为数组。
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'field_class' => $this->fieldClass,
+            'field' => $this->field,
+            'opt' => $this->operator,
+            'value' => $this->value,
+        ];
+    }
 }

@@ -11,7 +11,7 @@ final class ABSpec
 {
     /**
      * @param array<string, list<Rule>> $rules
-     * @param array<string, array<string, mixed>> $variantValues
+     * @param array<int|string, array<string, mixed>> $variantValues
      */
     public function __construct(
         public readonly int $id,
@@ -50,14 +50,14 @@ final class ABSpec
         $variantValues = [];
         foreach (($data['variant_payloads'] ?? []) as $variantId => $payload) {
             if (is_array($payload)) {
-                $variantValues[(string) $variantId] = $payload;
+                $variantValues[$variantId] = $payload;
                 continue;
             }
 
             if (is_string($payload) && $payload !== '') {
                 $decoded = json_decode($payload, true);
                 if (is_array($decoded)) {
-                    $variantValues[(string) $variantId] = $decoded;
+                    $variantValues[$variantId] = $decoded;
                 }
             }
         }
@@ -77,5 +77,37 @@ final class ABSpec
             $rules,
             $variantValues,
         );
+    }
+
+    /**
+     * 导出为数组。
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        $rules = [];
+        foreach ($this->rules as $ruleType => $ruleList) {
+            $rules[$ruleType] = array_map(
+                static fn (Rule $rule): array => $rule->toArray(),
+                $ruleList
+            );
+        }
+
+        return [
+            'id' => $this->id,
+            'key' => $this->key,
+            'name' => $this->name,
+            'typ' => $this->type,
+            'traffic' => $this->traffic,
+            'subject_id' => $this->subjectId,
+            'enabled' => $this->enabled,
+            'sticky' => $this->sticky,
+            'salt' => $this->salt,
+            'version' => $this->version,
+            'disable_impress' => $this->disableImpress,
+            'rules' => $rules,
+            'variant_payloads' => $this->variantValues,
+        ];
     }
 }

@@ -23,4 +23,16 @@ final class ABEnv
     {
         return new self((bool) ($data['always_track'] ?? false));
     }
+
+    /**
+     * 导出为数组。
+     *
+     * @return array<string, bool>
+     */
+    public function toArray(): array
+    {
+        return [
+            'always_track' => $this->alwaysTrack,
+        ];
+    }
 }

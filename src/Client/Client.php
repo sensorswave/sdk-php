@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace SensorsWave\Client;
 
+use JsonException;
+use SensorsWave\ABTesting\ABCore;
+use SensorsWave\ABTesting\ABResult;
+use SensorsWave\ABTesting\ExposureLogging\ABImpressionFactory;
+use SensorsWave\ABTesting\HttpSignatureMetaLoader;
+use SensorsWave\ABTesting\StorageFactory;
 use InvalidArgumentException;
 use SensorsWave\Config\Config;
 use SensorsWave\Exception\EmptyUserIdsException;
@@ -25,9 +31,14 @@ use SensorsWave\Tracking\UserPropertyEventFactory;
  */
 final class Client
 {
+    public const AB_TYPE_GATE = 1;
+    public const AB_TYPE_CONFIG = 2;
+    public const AB_TYPE_EXPERIMENT = 3;
+
     private bool $closed = false;
     private readonly TransportInterface $transport;
     private readonly string $normalizedEndpoint;
+    private readonly ?ABCore $abCore;
 
     private function __construct(
         string $endpoint,
@@ -36,6 +47,7 @@ final class Client
     ) {
         $this->normalizedEndpoint = self::normalizeEndpoint($endpoint);
         $this->transport = $config->transport ?? new HttpClient();
+        $this->abCore = $this->buildABCore($config);
     }
 
     /**
@@ -190,6 +202,56 @@ final class Client
     }
 
     /**
+     * 执行 gate 求值。
+     */
+    public function checkFeatureGate(User $user, string $key): bool
+    {
+        $this->validateUser($user);
+        $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_GATE);
+        if (!$result->disableImpress && $result->key !== '') {
+            $this->track(ABImpressionFactory::create($user, $result));
+        }
+
+        return $result->checkFeatureGate();
+    }
+
+    /**
+     * 获取 feature config。
+     */
+    public function getFeatureConfig(User $user, string $key): ABResult
+    {
+        $this->validateUser($user);
+        $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_CONFIG);
+        if (!$result->disableImpress && $result->key !== '') {
+            $this->track(ABImpressionFactory::create($user, $result));
+        }
+
+        return $result;
+    }
+
+    /**
+     * 获取 experiment 结果。
+     */
+    public function getExperiment(User $user, string $key): ABResult
+    {
+        $this->validateUser($user);
+        $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_EXPERIMENT);
+        if (!$result->disableImpress && $result->key !== '') {
+            $this->track(ABImpressionFactory::create($user, $result));
+        }
+
+        return $result;
+    }
+
+    /**
+     * 导出当前 A/B metadata 快照。
+     */
+    public function getABSpecs(): string
+    {
+        return $this->requireABCore()->getABSpecs();
+    }
+
+    /**
      * 校验用户标识。
      */
     private function validateUser(User $user): void
@@ -197,6 +259,62 @@ final class Client
         if ($user->anonId() === '' && $user->loginId() === '') {
             throw new EmptyUserIdsException();
         }
+    }
+
+    /**
+     * 构建 A/B core。
+     */
+    private function buildABCore(Config $config): ?ABCore
+    {
+        if ($config->ab === null) {
+            return null;
+        }
+
+        if ($config->ab->loadABSpecs !== '') {
+            try {
+                return new ABCore(
+                    StorageFactory::fromJson($config->ab->loadABSpecs),
+                    $config->ab->stickyHandler
+                );
+            } catch (JsonException) {
+                return null;
+            }
+        }
+
+        if ($config->ab->projectSecret === '') {
+            return null;
+        }
+
+        $metaEndpoint = $config->ab->metaEndpoint !== ''
+            ? self::normalizeEndpoint($config->ab->metaEndpoint)
+            : $this->normalizedEndpoint;
+        $metaUriPath = self::normalizeUriPath($config->ab->metaUriPath, '/ab/all4eval');
+
+        try {
+            $storage = (new HttpSignatureMetaLoader(
+                endpoint: $metaEndpoint,
+                uriPath: $metaUriPath,
+                sourceToken: $this->sourceToken,
+                projectSecret: $config->ab->projectSecret,
+                transport: $this->transport,
+            ))->load();
+
+            return new ABCore($storage, $config->ab->stickyHandler);
+        } catch (JsonException|\RuntimeException|\InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    /**
+     * 获取已初始化的 A/B core。
+     */
+    private function requireABCore(): ABCore
+    {
+        if ($this->abCore === null) {
+            throw new InvalidArgumentException('ab core not initialized');
+        }
+
+        return $this->abCore;
     }
 
     /**
@@ -247,5 +365,17 @@ final class Client
         }
 
         return $normalized;
+    }
+
+    /**
+     * 归一化 URI path。
+     */
+    private static function normalizeUriPath(string $uriPath, string $defaultPath): string
+    {
+        if ($uriPath === '') {
+            return $defaultPath;
+        }
+
+        return str_starts_with($uriPath, '/') ? $uriPath : '/' . $uriPath;
     }
 }

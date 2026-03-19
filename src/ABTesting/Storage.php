@@ -47,4 +47,25 @@ final class Storage
     {
         return $this->specs;
     }
+
+    /**
+     * 导出为可回灌的 JSON 结构。
+     *
+     * @return array<string, mixed>
+     */
+    public function toPayload(): array
+    {
+        return [
+            'code' => 0,
+            'data' => [
+                'update' => true,
+                'update_time' => $this->updateTime,
+                'ab_env' => $this->abEnv->toArray(),
+                'ab_specs' => array_map(
+                    static fn (ABSpec $spec): array => $spec->toArray(),
+                    array_values($this->specs)
+                ),
+            ],
+        ];
+    }
 }
