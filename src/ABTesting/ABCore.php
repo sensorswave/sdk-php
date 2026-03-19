@@ -534,6 +534,10 @@ final class ABCore
      */
     private function toTimestamp(mixed $value): ?int
     {
+        if ($value === null || $value === '') {
+            return 0;
+        }
+
         if (is_int($value)) {
             return $this->normalizeTimestamp($value);
         }
@@ -547,8 +551,12 @@ final class ABCore
                 return $this->normalizeTimestamp((int) $value);
             }
 
-            $date = new DateTimeImmutable($value);
-            return $date->getTimestamp();
+            try {
+                $date = new DateTimeImmutable($value);
+                return $date->getTimestamp();
+            } catch (\Exception) {
+                return null;
+            }
         }
 
         return null;

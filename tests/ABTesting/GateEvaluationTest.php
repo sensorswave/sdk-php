@@ -9,6 +9,7 @@ use SensorsWave\ABTesting\ABCore;
 use SensorsWave\Model\User;
 use SensorsWave\Model\Properties;
 use SensorsWave\Tests\Support\FixtureLoader;
+use SensorsWave\Tests\Support\MemoryStickyHandler;
 
 final class GateEvaluationTest extends TestCase
 {
@@ -225,6 +226,12 @@ final class GateEvaluationTest extends TestCase
             'After_Time_Gate',
             ABCore::TYPE_GATE
         )->checkFeatureGate());
+
+        self::assertTrue($beforeCore->evaluate(
+            new User('', 'user-missing'),
+            'Before_Time_Gate',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
     }
 
     public function testGateCustomFieldOverrideAndAnonIdSubject(): void
@@ -292,5 +299,140 @@ final class GateEvaluationTest extends TestCase
         self::assertTrue($resultMap['Gate_B']->checkFeatureGate());
         self::assertFalse($resultMap['Gate_C']->checkFeatureGate());
         self::assertSame('fail', $resultMap['Gate_C']->variantId);
+    }
+
+    public function testGateNoneOfSensitivePropsAndReleaseGate(): void
+    {
+        $noneOfSensitiveCore = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/noneof_sensitive.json'
+        ));
+        $releaseCore = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/release.json'
+        ));
+
+        self::assertTrue($noneOfSensitiveCore->evaluate(
+            new User('', 'user-pass'),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+        self::assertFalse($noneOfSensitiveCore->evaluate(
+            new User('', 'user-pass', Properties::create()->set('$browser_name', 'Chrome')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+        self::assertTrue($noneOfSensitiveCore->evaluate(
+            new User('', 'user-pass', Properties::create()->set('$browser_name', 'chrome')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+
+        self::assertTrue($releaseCore->evaluate(
+            new User('', 'user-pass'),
+            'ReleaseGate',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+        self::assertTrue($releaseCore->evaluate(
+            new User('', 'user-other'),
+            'ReleaseGate',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+    }
+
+    public function testGateStickyUsesCacheAndPersistsPassResult(): void
+    {
+        $handler = new MemoryStickyHandler();
+        $handler->data['25-user-cache'] = json_encode(['v' => 'pass'], JSON_THROW_ON_ERROR);
+
+        $core = new ABCore(
+            FixtureLoader::loadStorageFromJson(dirname(__DIR__) . '/Fixtures/ab/gate/sticky.json'),
+            $handler
+        );
+
+        $cached = $core->evaluate(
+            new User('', 'user-cache', Properties::create()->set('is_premium', false)),
+            'Sticky_Is_True_Gate',
+            ABCore::TYPE_GATE
+        );
+        self::assertTrue($cached->checkFeatureGate());
+
+        $fresh = $core->evaluate(
+            new User('', 'user-new', Properties::create()->set('is_premium', true)),
+            'Sticky_Is_True_Gate',
+            ABCore::TYPE_GATE
+        );
+        self::assertTrue($fresh->checkFeatureGate());
+        self::assertArrayHasKey('25-user-new', $handler->data);
+    }
+
+    public function testGateHoldoutAndDependentGateFail(): void
+    {
+        $holdoutCore = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/holdout.json'
+        ));
+        $gateFailCore = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/gate_fail.json'
+        ));
+
+        self::assertFalse($holdoutCore->evaluate(
+            new User('', 'user1', Properties::create()->set('$app_version', '10.0')),
+            'holdout_gate',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+        self::assertTrue($holdoutCore->evaluate(
+            new User('', 'user2', Properties::create()->set('$app_version', '10.1')),
+            'holdout_gate',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+
+        self::assertTrue($gateFailCore->evaluate(
+            new User('', 'user-pass', Properties::create()->set('country', 'CN')),
+            'Gate_Fail_Dependent',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+        self::assertTrue($gateFailCore->evaluate(
+            new User('', 'user-pass', Properties::create()->set('country', 'US')),
+            'Gate_Fail_Dependent',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+    }
+
+    public function testGateComplicateRuleChain(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/complicate.json'
+        ));
+
+        self::assertTrue($core->evaluate(
+            new User('any', 'other', Properties::create()
+                ->set('$app_version', '9.0')
+                ->set('$browser_name', 'Firefox')
+                ->set('age', 5)
+            ),
+            'AnonIdTest',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+
+        self::assertTrue($core->evaluate(
+            new User('any', 'other', Properties::create()
+                ->set('$app_version', '9.0')
+                ->set('$browser_name', 'Firefox')
+                ->set('age', 5)
+                ->set('$device_model', 'Pixel')
+                ->set('$country', 'US')
+            ),
+            'AnonIdTest',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
+
+        self::assertFalse($core->evaluate(
+            new User('any', 'other', Properties::create()
+                ->set('$app_version', '9.0')
+                ->set('$browser_name', 'Firefox')
+                ->set('age', 5)
+                ->set('$device_model', 'Pixel')
+            ),
+            'AnonIdTest',
+            ABCore::TYPE_GATE
+        )->checkFeatureGate());
     }
 }
