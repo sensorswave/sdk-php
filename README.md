@@ -43,6 +43,7 @@ $client->trackEvent(
     ['page' => '/home'],
 );
 
+$client->flush();
 $client->close();
 ```
 
@@ -59,12 +60,13 @@ For `identify`, you must provide both `anonId` and `loginId`.
 
 The tracking client buffers events in memory and flushes them as JSON arrays.
 The SDK flushes automatically when the batch reaches 50 events or when you
-call `close()`. In short-lived PHP processes, call `close()` before exit to
-drain the pending batch.
+call `flush()` or `close()`. In short-lived PHP processes, call `flush()` or
+`close()` before exit to drain the pending batch.
 
 The client currently supports these tracking methods:
 
 - `identify(User $user): void`
+- `flush(): void`
 - `trackEvent(User $user, string $eventName, array|Properties $properties = []): void`
 - `track(Event $event): void`
 - `profileSet(User $user, array|Properties $properties): void`

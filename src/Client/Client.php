@@ -84,6 +84,18 @@ final class Client
     }
 
     /**
+     * 立即刷出当前缓冲中的埋点事件。
+     */
+    public function flush(): void
+    {
+        if ($this->closed) {
+            return;
+        }
+
+        $this->flushPendingTrackMessages();
+    }
+
+    /**
      * 发送 Identify 事件。
      */
     public function identify(User $user): void

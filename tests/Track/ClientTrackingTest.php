@@ -286,6 +286,32 @@ final class ClientTrackingTest extends TestCase
         self::assertSame('BufferedTwo', $payload[1]['event']);
     }
 
+    public function testFlushSendsBufferedEventsWithoutClosingClient(): void
+    {
+        $transport = new FakeTransport();
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(transport: $transport)
+        );
+
+        $client->trackEvent(new User('anon-1', 'user-1'), 'FlushOne', ['step' => 1]);
+        $client->trackEvent(new User('anon-2', 'user-2'), 'FlushTwo', ['step' => 2]);
+
+        self::assertCount(0, $transport->requests);
+
+        $client->flush();
+
+        self::assertCount(1, $transport->requests);
+        $payload = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertCount(2, $payload);
+        self::assertSame('FlushOne', $payload[0]['event']);
+        self::assertSame('FlushTwo', $payload[1]['event']);
+
+        $client->close();
+        self::assertCount(1, $transport->requests);
+    }
+
     public function testTrackFlushesWhenBatchReachesFiftyEvents(): void
     {
         $transport = new FakeTransport();
