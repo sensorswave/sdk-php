@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SensorsWave\Tests\Track;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use SensorsWave\Client\Client;
@@ -77,6 +78,46 @@ final class ClientTrackingTest extends TestCase
         self::assertSame('php', $payload[0]['properties']['$lib']);
     }
 
+    public function testTrackEventFallsBackToDefaultTrackPathWhenConfigPathIsEmpty(): void
+    {
+        $transport = new FakeTransport();
+        $client = Client::create(
+            'https://collector.example.com/custom/path',
+            'test-token',
+            new Config(trackUriPath: '', transport: $transport)
+        );
+
+        $client->trackEvent(new User('anon-123', 'user-456'), 'DefaultPathEvent', []);
+        $client->close();
+
+        self::assertCount(1, $transport->requests);
+        self::assertSame('https://collector.example.com/in/track', $transport->requests[0]->url);
+    }
+
+    public function testTrackEventNormalizesCustomTrackPathWithoutLeadingSlash(): void
+    {
+        $transport = new FakeTransport();
+        $client = Client::create(
+            'https://collector.example.com/custom/path',
+            'test-token',
+            new Config(trackUriPath: 'custom-track', transport: $transport)
+        );
+
+        $client->trackEvent(new User('anon-123', 'user-456'), 'CustomPathEvent', []);
+        $client->close();
+
+        self::assertCount(1, $transport->requests);
+        self::assertSame('https://collector.example.com/custom-track', $transport->requests[0]->url);
+    }
+
+    public function testCreateRejectsUnsupportedEndpointScheme(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('scheme must be http or https');
+
+        Client::create('ftp://collector.example.com', 'test-token', new Config(transport: new FakeTransport()));
+    }
+
     public function testTrackingApisAcceptPlainPhpArrays(): void
     {
         $transport = new FakeTransport();
@@ -135,6 +176,28 @@ final class ClientTrackingTest extends TestCase
         self::assertSame('pro', $payload[0]['user_properties']['$set']['plan']);
     }
 
+    public function testProfileIncrementIgnoresNonNumericValues(): void
+    {
+        $transport = new FakeTransport();
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(transport: $transport)
+        );
+
+        $client->profileIncrement(
+            new User('anon-123', 'user-456'),
+            ['coins' => 3, 'plan' => 'pro']
+        );
+        $client->close();
+
+        $payload = json_decode($transport->requests[0]->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('$UserSet', $payload[0]['event']);
+        self::assertSame('user_increment', $payload[0]['properties']['$user_set_type']);
+        self::assertSame(['coins' => 3], $payload[0]['user_properties']['$increment']);
+        self::assertArrayNotHasKey('plan', $payload[0]['user_properties']['$increment']);
+    }
+
     public function testTrackEventRequiresAtLeastOneUserId(): void
     {
         $client = Client::create(
@@ -145,6 +208,20 @@ final class ClientTrackingTest extends TestCase
 
         $this->expectException(EmptyUserIdsException::class);
         $client->trackEvent(new User('', ''), 'PageView', Properties::create());
+    }
+
+    public function testTrackEventRejectsNewEventsAfterClose(): void
+    {
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(transport: new FakeTransport())
+        );
+        $client->close();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('the client was already closed');
+        $client->trackEvent(new User('anon-123', 'user-456'), 'AfterClose', []);
     }
 
     public function testTrackEventRetriesFailedHttpResponsesAndInvokesFailureHandler(): void
@@ -225,6 +302,31 @@ final class ClientTrackingTest extends TestCase
         self::assertSame('RetryExceptionEvent', $failedEvents[0]['event']);
         self::assertInstanceOf(RuntimeException::class, $failedError);
         self::assertSame('network down', $failedError->getMessage());
+    }
+
+    public function testTrackEventDoesNotRetryClientErrors(): void
+    {
+        $transport = new class implements TransportInterface {
+            public int $attempts = 0;
+
+            public function send(Request $request): Response
+            {
+                $this->attempts++;
+
+                return new Response(400, '{"msg":"bad request"}');
+            }
+        };
+
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(transport: $transport, httpRetry: 2)
+        );
+
+        $client->trackEvent(new User('anon-123', 'user-456'), 'BadRequestEvent', ['page' => '/bad']);
+        $client->close();
+
+        self::assertSame(1, $transport->attempts);
     }
 
     public function testTrackEventDoesNotInvokeFailureHandlerAfterSuccessfulRetry(): void

@@ -21,7 +21,7 @@ final class Config
         ?LoggerInterface $logger = null,
         public readonly string $trackUriPath = '/in/track',
         public readonly int $flushIntervalMs = 10_000,
-        public readonly int $httpConcurrency = 10,
+        public readonly int $httpConcurrency = 1,
         public readonly int $httpTimeoutMs = 3_000,
         public readonly int $httpRetry = 2,
         ?callable $onTrackFailHandler = null,

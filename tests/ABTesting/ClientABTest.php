@@ -444,7 +444,7 @@ final class ClientABTest extends TestCase
         );
 
         self::assertFalse($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
-        usleep(20_000);
+        self::rewindMetaRefreshWindow($client);
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
         $client->close();
 
@@ -504,7 +504,7 @@ final class ClientABTest extends TestCase
         );
 
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
-        usleep(20_000);
+        self::rewindMetaRefreshWindow($client);
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
         $client->close();
 
@@ -513,6 +513,53 @@ final class ClientABTest extends TestCase
             static fn (Request $request): bool => $request->method === 'GET'
         ));
         self::assertCount(2, $getRequests);
+    }
+
+    public function testClientNormalizesMetaLoadIntervalToThirtySecondsMinimum(): void
+    {
+        $metaBody = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
+        $transport = new class ($metaBody) implements TransportInterface {
+            /** @var list<Request> */
+            public array $requests = [];
+
+            public function __construct(private readonly string $metaBody)
+            {
+            }
+
+            public function send(Request $request): Response
+            {
+                $this->requests[] = $request;
+
+                if ($request->method === 'GET') {
+                    return new Response(200, $this->metaBody);
+                }
+
+                return new Response(200, '{}');
+            }
+        };
+
+        $client = Client::create(
+            'http://example.com',
+            'test-token',
+            new Config(
+                transport: $transport,
+                ab: new ABConfig(
+                    projectSecret: 'secret',
+                    metaLoadIntervalMs: 10,
+                )
+            )
+        );
+
+        self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        usleep(20_000);
+        self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
+        $client->close();
+
+        $getRequests = array_values(array_filter(
+            $transport->requests,
+            static fn (Request $request): bool => $request->method === 'GET'
+        ));
+        self::assertCount(1, $getRequests);
     }
 
     public function testClientLogsRefreshFailureAndKeepsExistingStorage(): void
@@ -580,10 +627,22 @@ final class ClientABTest extends TestCase
         );
 
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
-        usleep(20_000);
+        self::rewindMetaRefreshWindow($client);
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
         $client->close();
         self::assertCount(1, $logger->errors);
         self::assertStringContainsString('ab meta refresh failed', $logger->errors[0]);
+    }
+
+    private static function rewindMetaRefreshWindow(Client $client): void
+    {
+        $reflection = new \ReflectionProperty($client, 'lastMetaLoadAtMs');
+
+        $current = $reflection->getValue($client);
+        if (!is_int($current)) {
+            self::fail('lastMetaLoadAtMs should be initialized after first remote load');
+        }
+
+        $reflection->setValue($client, $current - 31_000);
     }
 }

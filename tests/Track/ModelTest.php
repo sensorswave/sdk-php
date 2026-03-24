@@ -6,6 +6,7 @@ namespace SensorsWave\Tests\Track;
 
 use PHPUnit\Framework\TestCase;
 use SensorsWave\Exception\EmptyUserIdsException;
+use SensorsWave\Exception\EventNameEmptyException;
 use SensorsWave\Model\Event;
 use SensorsWave\Model\Properties;
 use SensorsWave\Model\User;
@@ -47,6 +48,14 @@ final class ModelTest extends TestCase
         $event = Event::create('', '', 'TestEvent');
 
         $this->expectException(EmptyUserIdsException::class);
+        $event->normalize();
+    }
+
+    public function testEventNormalizeRequiresNonEmptyEventName(): void
+    {
+        $event = Event::create('anon-123', 'user-456', '');
+
+        $this->expectException(EventNameEmptyException::class);
         $event->normalize();
     }
 

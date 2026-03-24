@@ -41,6 +41,7 @@ final class Client
     private bool $closed = false;
     private readonly TransportInterface $transport;
     private readonly string $normalizedEndpoint;
+    private readonly string $normalizedTrackUriPath;
     private ?ABCore $abCore = null;
     private ?HttpSignatureMetaLoader $metaLoader = null;
     private int $metaLoadIntervalMs = 0;
@@ -57,6 +58,7 @@ final class Client
         private readonly Config $config,
     ) {
         $this->normalizedEndpoint = self::normalizeEndpoint($endpoint);
+        $this->normalizedTrackUriPath = self::normalizeUriPath($config->trackUriPath, '/in/track');
         $this->transport = $config->transport ?? new HttpClient();
         $this->stickyHandler = $config->ab?->stickyHandler;
         $this->abCore = $this->buildABCore($config);
@@ -340,7 +342,9 @@ final class Client
                 projectSecret: $config->ab->projectSecret,
                 transport: $this->transport,
             );
-            $this->metaLoadIntervalMs = max(0, $config->ab->metaLoadIntervalMs);
+            $this->metaLoadIntervalMs = $config->ab->metaLoadIntervalMs < 30_000
+                ? 30_000
+                : $config->ab->metaLoadIntervalMs;
         }
 
         if ($storage !== null) {
@@ -377,6 +381,9 @@ final class Client
     ): Event {
         $options = UserPropertyOptions::create();
         foreach ($properties->all() as $key => $value) {
+            if ($method === 'increment' && !is_int($value) && !is_float($value)) {
+                continue;
+            }
             $options->{$method}($key, $value);
         }
 
@@ -412,7 +419,7 @@ final class Client
     {
         $request = new Request(
             'POST',
-            $this->normalizedEndpoint . $this->config->trackUriPath,
+            $this->normalizedEndpoint . $this->normalizedTrackUriPath,
             [
                 'Content-Type' => 'application/json',
                 'SourceToken' => $this->sourceToken,
@@ -429,6 +436,10 @@ final class Client
                 $lastStatusCode = $response->statusCode;
                 if ($this->isSuccessfulTrackResponse($response)) {
                     return;
+                }
+
+                if (!$this->isRetryableTrackResponse($response)) {
+                    break;
                 }
             } catch (\Throwable $throwable) {
                 $lastError = $throwable;
@@ -453,6 +464,14 @@ final class Client
     private function isSuccessfulTrackResponse(Response $response): bool
     {
         return $response->statusCode === 200;
+    }
+
+    /**
+     * 判断埋点响应是否允许重试。
+     */
+    private function isRetryableTrackResponse(Response $response): bool
+    {
+        return $response->statusCode >= 500;
     }
 
     /**

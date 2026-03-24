@@ -9,6 +9,60 @@ use SensorsWave\Signing\RequestSigner;
 
 final class RequestSignerTest extends TestCase
 {
+    public function testGetSignatureMatchesHarnessGolden(): void
+    {
+        $headers = [
+            'x-auth-timestamp' => '1736668800000',
+            'x-auth-nonce' => 'test-nonce-12345',
+        ];
+
+        $authorization = RequestSigner::sign(
+            'GET',
+            '/ab/all4eval',
+            '',
+            $headers,
+            '',
+            'test-project-token',
+            'test-secret-key'
+        );
+
+        self::assertSame(
+            'ACS3-HMAC-SHA256 Credential=test-project-token,SignedHeaders=x-auth-nonce;x-auth-timestamp;x-content-sha256,Signature=e89020ca2a7b486f575103bf90eec8ffbabb1650f22b6cb97bbf5347c014c1ae',
+            $authorization
+        );
+        self::assertSame(
+            'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+            $headers['x-content-sha256']
+        );
+    }
+
+    public function testPostSignatureMatchesHarnessGolden(): void
+    {
+        $headers = [
+            'x-auth-timestamp' => '1736668800000',
+            'x-auth-nonce' => 'nonce-abc123',
+        ];
+
+        $authorization = RequestSigner::sign(
+            'POST',
+            '/ab/data',
+            'param1=value1&param2=value2',
+            $headers,
+            '{"key":"value","number":123}',
+            'project-abc',
+            'secret-xyz'
+        );
+
+        self::assertSame(
+            'ACS3-HMAC-SHA256 Credential=project-abc,SignedHeaders=x-auth-nonce;x-auth-timestamp;x-content-sha256,Signature=20c447a1135cddeb6eca0beb002d765c7390efa0859398397d36444c8cf5fec5',
+            $authorization
+        );
+        self::assertSame(
+            'b6b2271a768080cc34aa8d72f60bd9c7c6f1dbd99eef57a34548c1a0d253d8bf',
+            $headers['x-content-sha256']
+        );
+    }
+
     public function testSignatureGenerationAndVerification(): void
     {
         $headers = [

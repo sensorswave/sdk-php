@@ -15,7 +15,7 @@ final class ABConfig
         public readonly string $projectSecret = '',
         public readonly string $metaEndpoint = '',
         public readonly string $metaUriPath = '/ab/all4eval',
-        public readonly int $metaLoadIntervalMs = 30_000,
+        public readonly int $metaLoadIntervalMs = 60_000,
         public readonly ?StickyHandlerInterface $stickyHandler = null,
         public readonly string $loadABSpecs = '',
     ) {
