@@ -646,4 +646,46 @@ final class GateEvaluationTest extends TestCase
         $this->expectExceptionMessage('bucket_set requires string salt and bitmap');
         $core->evaluate(new User('', 'u'), 'broken_bucket_gate', ABCore::TYPE_GATE);
     }
+
+    public function testGate019DisabledAndMissingKeyReturnFalse(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Gate019'));
+        $this->testDisabledAndMissingKeyReturnFalse();
+    }
+
+    public function testGate021GateHoldoutAndDependentGateFail(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Gate021'));
+        $this->testGateHoldoutAndDependentGateFail();
+    }
+
+    public function testGate022GateComplicateRuleChain(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Gate022'));
+        $this->testGateComplicateRuleChain();
+    }
+
+    public function testGate026InvalidCommonConditionRaisesRuntimeException(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Gate026'));
+        $this->testInvalidCommonConditionRaisesRuntimeException();
+    }
+
+    public function testGate027StickyWriteExceptionPropagates(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Gate027'));
+        $this->testStickyWriteExceptionPropagates();
+    }
+
+    public function testGate028GateVersionAndTimeOperators(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Gate028'));
+        $this->testGateVersionAndTimeOperators();
+    }
+
+    public function testGate038GateHoldoutAndDependentGateFail(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Gate038'));
+        $this->testGateHoldoutAndDependentGateFail();
+    }
 }

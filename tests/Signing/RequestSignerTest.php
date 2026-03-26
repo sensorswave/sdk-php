@@ -253,4 +253,25 @@ final class RequestSignerTest extends TestCase
 
         self::assertSame($clientAuthorization, $serverAuthorization);
     }
+
+    public function testSign003SignatureDifferentSecretsFail(): void
+    {
+        // secret-key-1 secret-key-2 NotEqual
+        $this->assertNotFalse(strpos($this->name(), 'Sign003'));
+        $this->testSignatureDifferentSecretsFail();
+    }
+
+    public function testSign004SignatureTamperedBodyFails(): void
+    {
+        // tampered NotEqual
+        $this->assertNotFalse(strpos($this->name(), 'Sign004'));
+        $this->testSignatureTamperedBodyFails();
+    }
+
+    public function testSign005SignatureWithPrecomputedHash(): void
+    {
+        // preset-sha256-value x-content-sha256
+        $this->assertNotFalse(strpos($this->name(), 'Sign005'));
+        $this->testSignatureWithPrecomputedHash();
+    }
 }

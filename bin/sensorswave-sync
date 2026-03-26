@@ -1,0 +1,26 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+use SensorsWave\Config\ABConfig;
+use SensorsWave\Worker\SyncCommand;
+
+$endpoint = $argv[1] ?? '';
+$sourceToken = $argv[2] ?? '';
+$projectSecret = $argv[3] ?? '';
+
+if ($endpoint === '' || $sourceToken === '' || $projectSecret === '') {
+    fwrite(STDERR, "Usage: sensorswave-sync <endpoint> <sourceToken> <projectSecret>\n");
+    exit(1);
+}
+
+$command = new SyncCommand(
+    $endpoint,
+    $sourceToken,
+    new ABConfig(projectSecret: $projectSecret)
+);
+
+exit($command->run());

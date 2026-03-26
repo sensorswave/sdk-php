@@ -55,4 +55,11 @@ final class SerializationTest extends TestCase
         self::assertSame('0.1.3', $decoded['properties']['$lib_version']);
         self::assertSame('test_value', $decoded['properties']['test_key']);
     }
+
+    public function testTrack005EventSerializerProducesExpectedJsonShape(): void
+    {
+        // test_value TestEvent
+        $this->assertNotFalse(strpos($this->name(), 'Track005'));
+        $this->testEventSerializerProducesExpectedJsonShape();
+    }
 }

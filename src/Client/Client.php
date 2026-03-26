@@ -8,7 +8,6 @@ use JsonException;
 use SensorsWave\ABTesting\ABCore;
 use SensorsWave\ABTesting\ABResult;
 use SensorsWave\ABTesting\ExposureLogging\ABImpressionFactory;
-use SensorsWave\ABTesting\HttpSignatureMetaLoader;
 use SensorsWave\ABTesting\StorageFactory;
 use InvalidArgumentException;
 use SensorsWave\Config\Config;
@@ -43,7 +42,6 @@ final class Client
     private readonly string $normalizedEndpoint;
     private readonly string $normalizedTrackUriPath;
     private ?ABCore $abCore = null;
-    private ?HttpSignatureMetaLoader $metaLoader = null;
     private int $metaLoadIntervalMs = 0;
     private ?int $lastMetaLoadAtMs = null;
     private readonly ?\SensorsWave\Contract\StickyHandlerInterface $stickyHandler;
@@ -62,6 +60,7 @@ final class Client
         $this->transport = $config->transport ?? new HttpClient();
         $this->stickyHandler = $config->ab?->stickyHandler;
         $this->abCore = $this->buildABCore($config);
+        register_shutdown_function([$this, 'close']);
     }
 
     /**
@@ -241,7 +240,11 @@ final class Client
     {
         $this->validateUser($user);
         $this->ensureABCoreFresh();
-        $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_GATE);
+        if ($this->abCore === null) {
+            return false;
+        }
+
+        $result = $this->abCore->evaluate($user, $key, self::AB_TYPE_GATE);
         $this->trackABImpressionIfNeeded($user, $result);
 
         return $result->checkFeatureGate();
@@ -254,7 +257,11 @@ final class Client
     {
         $this->validateUser($user);
         $this->ensureABCoreFresh();
-        $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_CONFIG);
+        if ($this->abCore === null) {
+            return new ABResult();
+        }
+
+        $result = $this->abCore->evaluate($user, $key, self::AB_TYPE_CONFIG);
         $this->trackABImpressionIfNeeded($user, $result);
 
         return $result;
@@ -267,7 +274,11 @@ final class Client
     {
         $this->validateUser($user);
         $this->ensureABCoreFresh();
-        $result = $this->requireABCore()->evaluate($user, $key, self::AB_TYPE_EXPERIMENT);
+        if ($this->abCore === null) {
+            return new ABResult();
+        }
+
+        $result = $this->abCore->evaluate($user, $key, self::AB_TYPE_EXPERIMENT);
         $this->trackABImpressionIfNeeded($user, $result);
 
         return $result;
@@ -282,8 +293,11 @@ final class Client
     {
         $this->validateUser($user);
         $this->ensureABCoreFresh();
+        if ($this->abCore === null) {
+            return [];
+        }
 
-        $results = $this->requireABCore()->evaluateAll($user);
+        $results = $this->abCore->evaluateAll($user);
         foreach ($results as $result) {
             $this->trackABImpressionIfNeeded($user, $result);
         }
@@ -319,40 +333,19 @@ final class Client
             return null;
         }
 
-        $storage = null;
+        $this->metaLoadIntervalMs = $config->ab->metaLoadIntervalMs < 30_000
+            ? 30_000
+            : $config->ab->metaLoadIntervalMs;
+
         if ($config->ab->loadABSpecs !== '') {
             try {
-                $storage = StorageFactory::fromJson($config->ab->loadABSpecs);
-                $this->lastMetaLoadAtMs = $this->nowMs();
-            } catch (JsonException) {
-                $storage = null;
+                $config->ab->abSpecStore->save($config->ab->loadABSpecs);
+            } catch (\Throwable $throwable) {
+                $config->logger->error(
+                    'ab snapshot bootstrap save failed',
+                    ['error' => $throwable->getMessage()]
+                );
             }
-        }
-
-        if ($config->ab->projectSecret !== '') {
-            $metaEndpoint = $config->ab->metaEndpoint !== ''
-                ? self::normalizeEndpoint($config->ab->metaEndpoint)
-                : $this->normalizedEndpoint;
-            $metaUriPath = self::normalizeUriPath($config->ab->metaUriPath, '/ab/all4eval');
-
-            $this->metaLoader = new HttpSignatureMetaLoader(
-                endpoint: $metaEndpoint,
-                uriPath: $metaUriPath,
-                sourceToken: $this->sourceToken,
-                projectSecret: $config->ab->projectSecret,
-                transport: $this->transport,
-            );
-            $this->metaLoadIntervalMs = $config->ab->metaLoadIntervalMs < 30_000
-                ? 30_000
-                : $config->ab->metaLoadIntervalMs;
-        }
-
-        if ($storage !== null) {
-            return new ABCore($storage, $this->stickyHandler);
-        }
-
-        if ($this->metaLoader === null) {
-            return null;
         }
 
         return $this->refreshABCore(true);
@@ -538,7 +531,17 @@ final class Client
         $this->pendingBodySize = 0;
         $this->lastTrackFlushAtMs = $this->nowMs();
 
-        $this->sendTrackRequest($body);
+        try {
+            /** @var list<array<string, mixed>> $events */
+            $events = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            $this->config->eventQueue->enqueue($events);
+        } catch (\Throwable $throwable) {
+            $this->config->logger->error(
+                'event queue enqueue failed',
+                ['error' => $throwable->getMessage()]
+            );
+            $this->notifyTrackFailure($body, $throwable, null);
+        }
     }
 
     /**
@@ -614,11 +617,7 @@ final class Client
      */
     private function ensureABCoreFresh(): void
     {
-        if ($this->metaLoader === null || $this->metaLoadIntervalMs === 0) {
-            return;
-        }
-
-        if ($this->lastMetaLoadAtMs !== null && $this->nowMs() - $this->lastMetaLoadAtMs < $this->metaLoadIntervalMs) {
+        if ($this->config->ab === null || $this->metaLoadIntervalMs === 0) {
             return;
         }
 
@@ -630,34 +629,52 @@ final class Client
      */
     private function refreshABCore(bool $forceInitialize): ?ABCore
     {
-        if ($this->metaLoader === null) {
-            return $this->abCore;
-        }
-
         try {
-            $result = $this->metaLoader->loadResult();
-            $this->lastMetaLoadAtMs = $this->nowMs();
+            if ($this->config->ab === null) {
+                return $this->abCore;
+            }
+
+            $metadata = $this->config->ab->abSpecStore->metadata();
+            if ($metadata->updatedAtMs === null) {
+                $this->abCore = null;
+                return null;
+            }
+
+            if ($this->nowMs() - $metadata->updatedAtMs > $this->metaLoadIntervalMs) {
+                $this->abCore = null;
+                return null;
+            }
+
+            if ($this->abCore !== null && $this->lastMetaLoadAtMs === $metadata->updatedAtMs) {
+                return $this->abCore;
+            }
+
+            $snapshot = $this->config->ab->abSpecStore->load();
+            if ($snapshot === null || $snapshot === '') {
+                $this->abCore = null;
+                return null;
+            }
+
+            $storage = StorageFactory::fromJson($snapshot);
+            $this->lastMetaLoadAtMs = $metadata->updatedAtMs;
 
             if ($this->abCore === null) {
-                $this->abCore = new ABCore($result->storage, $this->stickyHandler);
+                $this->abCore = new ABCore($storage, $this->stickyHandler);
                 return $this->abCore;
             }
 
-            if (!$result->update && $this->abCore->storageUpdateTime() === $result->storage->updateTime) {
-                return $this->abCore;
-            }
-
-            $this->abCore->replaceStorage($result->storage);
+            $this->abCore->replaceStorage($storage);
             return $this->abCore;
-        } catch (JsonException|\RuntimeException|\InvalidArgumentException) {
+        } catch (\Throwable) {
             $this->config->logger->error(
-                'ab meta refresh failed',
+                'ab snapshot reload failed',
                 [
                     'source_token' => $this->sourceToken,
                     'force_initialize' => $forceInitialize,
                 ]
             );
-            return $forceInitialize ? null : $this->abCore;
+            $this->abCore = null;
+            return null;
         }
     }
 
@@ -667,5 +684,10 @@ final class Client
     private function nowMs(): int
     {
         return (int) floor(microtime(true) * 1000);
+    }
+
+    public function __destruct()
+    {
+        $this->close();
     }
 }

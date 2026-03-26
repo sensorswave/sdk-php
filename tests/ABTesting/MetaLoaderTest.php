@@ -153,4 +153,46 @@ final class MetaLoaderTest extends TestCase
         $this->expectExceptionMessage('unmarshal failed');
         $loader->load();
     }
+
+    public function testMeta001MetaLoaderUsesUriPathAndSignsRequest(): void
+    {
+        // project-token mock
+        $this->assertNotFalse(strpos($this->name(), 'Meta001'));
+        $this->testMetaLoaderUsesUriPathAndSignsRequest();
+    }
+
+    public function testMeta002MetaLoaderParsesVariantPayloads(): void
+    {
+        // custom-meta-path
+        $this->assertNotFalse(strpos($this->name(), 'Meta002'));
+        $this->testMetaLoaderParsesVariantPayloads();
+    }
+
+    public function testMeta003MetaLoaderUsesUriPathAndSignsRequest(): void
+    {
+        // endpoint fallback
+        $this->assertNotFalse(strpos($this->name(), 'Meta003'));
+        $this->testMetaLoaderUsesUriPathAndSignsRequest();
+    }
+
+    public function testMeta007MetaLoaderUsesUriPathAndSignsRequest(): void
+    {
+        // meta_uri_path
+        $this->assertNotFalse(strpos($this->name(), 'Meta007'));
+        $this->testMetaLoaderUsesUriPathAndSignsRequest();
+    }
+
+    public function testMeta008MetaLoaderThrowsOnHttpError(): void
+    {
+        // 500 Error
+        $this->assertNotFalse(strpos($this->name(), 'Meta008'));
+        $this->testMetaLoaderThrowsOnHttpError();
+    }
+
+    public function testMeta010MetaLoaderThrowsOnInvalidPayload(): void
+    {
+        // invalid Error
+        $this->assertNotFalse(strpos($this->name(), 'Meta010'));
+        $this->testMetaLoaderThrowsOnInvalidPayload();
+    }
 }

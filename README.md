@@ -1,15 +1,18 @@
 # SensorsWave PHP SDK
 
-A lightweight PHP SDK for SensorsWave event tracking and A/B testing.
+SensorsWave PHP SDK uses a local-only request runtime. Request-path code reads
+A/B snapshots from a local store and appends tracking data to a local queue. A
+separate worker process performs remote metadata sync and event delivery.
 
 ## Features
 
+- Local-only request runtime for PHP/FPM
 - Event tracking with automatic `$lib` and `$lib_version` injection
 - User profile operations: set, set once, increment, append, union, unset, delete
-- ACS3-HMAC-SHA256 request signing
-- A/B feature gate, config, and experiment evaluation
-- Automatic exposure logging after A/B evaluation
-- Remote metadata loading, refresh, and snapshot bootstrap
+- ACS3-HMAC-SHA256 request signing for worker-side metadata sync
+- A/B feature gate, config, and experiment evaluation from local snapshots
+- Automatic exposure logging queued after A/B evaluation
+- Default local file adapters, with Redis adapter support through abstractions
 
 ## Installation
 
@@ -19,9 +22,22 @@ This repository is private and not published to Packagist yet.
 composer install
 ```
 
-## Quick Start
+## Runtime model
 
-### Basic Event Tracking
+The PHP SDK does not perform remote I/O on the request path.
+
+- `Client` reads A/B snapshots from `ABSpecStore`
+- `Client` writes tracking and impression payloads to `EventQueue`
+- `sensorswave-sync` pulls remote metadata and saves snapshots
+- `sensorswave-send` reads queued events and sends them to the collector
+
+By default, the SDK uses local file adapters under `sys_get_temp_dir()`. You
+can replace them with Redis-backed adapters by implementing the Redis client
+abstraction.
+
+## Quick start
+
+### 1. Create the client
 
 ```php
 <?php
@@ -42,42 +58,36 @@ $client->trackEvent($user, 'PageView', [
     'page' => '/home',
 ]);
 
-$client->flush();
 $client->close();
 ```
 
-### Enable A/B Testing
+### 2. Sync A/B snapshots out of band
 
-```php
-<?php
+Run the sync worker on a schedule.
 
-declare(strict_types=1);
-
-use SensorsWave\Client\Client;
-use SensorsWave\Config\ABConfig;
-use SensorsWave\Config\Config;
-use SensorsWave\Model\User;
-
-$client = Client::create(
-    'https://collector.example.com',
-    'your-source-token',
-    new Config(
-        ab: new ABConfig(
-            projectSecret: 'your-project-secret',
-        ),
-    ),
-);
-
-$user = new User(loginId: 'user-123');
-
-$gatePassed = $client->checkFeatureGate($user, 'my_gate');
-$config = $client->getFeatureConfig($user, 'my_config');
-$experiment = $client->getExperiment($user, 'my_experiment');
+```bash
+./bin/sensorswave-sync https://collector.example.com your-source-token your-project-secret
 ```
 
-## API Reference
+### 3. Send queued events out of band
 
-### Client Construction
+Run the send worker on a schedule.
+
+```bash
+./bin/sensorswave-send https://collector.example.com your-source-token
+```
+
+## A/B behavior
+
+The PHP client only evaluates from local snapshots.
+
+- If a valid snapshot exists, the client evaluates gates, configs, and experiments locally
+- If the snapshot is missing or stale, gate checks fail closed
+- The client never falls back to remote metadata refresh on the request path
+
+## API reference
+
+### Client construction
 
 | Method | Description |
 |--------|-------------|
@@ -87,23 +97,23 @@ $experiment = $client->getExperiment($user, 'my_experiment');
 
 | Method | Description |
 |--------|-------------|
-| `close(): void` | Flush remaining events and close the client |
-| `flush(): void` | Flush the current buffered batch without closing |
+| `close(): void` | Flush in-memory events into the local queue and close the client |
+| `flush(): void` | Flush the current buffered batch into the local queue without closing |
 
-### User Identity
+### User identity
 
 | Method | Description |
 |--------|-------------|
 | `identify(User $user): void` | Link anonymous ID with login ID; both are required |
 
-### Event Tracking
+### Event tracking
 
 | Method | Description |
 |--------|-------------|
 | `trackEvent(User $user, string $eventName, array|Properties $properties = []): void` | Track a named event with properties |
 | `track(Event $event): void` | Track a fully constructed event |
 
-### User Profile Operations
+### User profile operations
 
 | Method | Description |
 |--------|-------------|
@@ -115,200 +125,57 @@ $experiment = $client->getExperiment($user, 'my_experiment');
 | `profileUnset(User $user, string ...$propertyKeys): void` | Remove user properties |
 | `profileDelete(User $user): void` | Delete the whole user profile |
 
-### A/B Testing
+### A/B testing
 
 | Method | Description |
 |--------|-------------|
-| `checkFeatureGate(User $user, string $key): bool` | Evaluate a feature gate |
-| `getFeatureConfig(User $user, string $key): ABResult` | Evaluate a feature config |
-| `getExperiment(User $user, string $key): ABResult` | Evaluate an experiment |
-| `evaluateAll(User $user): array` | Evaluate all currently loaded specs and emit impressions |
-| `getABSpecs(): string` | Export current A/B metadata snapshot |
+| `checkFeatureGate(User $user, string $key): bool` | Evaluate a feature gate from the local snapshot |
+| `getFeatureConfig(User $user, string $key): ABResult` | Evaluate a feature config from the local snapshot |
+| `getExperiment(User $user, string $key): ABResult` | Evaluate an experiment from the local snapshot |
+| `evaluateAll(User $user): array` | Evaluate all currently loaded specs and queue impressions |
+| `getABSpecs(): string` | Export the current A/B metadata snapshot |
 
-### Request Signing
+## Configuration options
 
-| Method | Description |
-|--------|-------------|
-| `RequestSigner::sign(...)` | Build ACS3-HMAC-SHA256 authorization headers |
-
-## User Type
-
-For all operations except `identify`, at least one of `anonId` or `loginId`
-must be non-empty. For `identify`, both IDs are required.
-
-```php
-$user = new User(
-    anonId: 'device-123',
-    loginId: 'user-123',
-    abUserProps: [
-        '$app_version' => '12.4.0',
-        '$country' => 'CN',
-    ],
-);
-```
-
-## Event Tracking
-
-### Identify User
-
-```php
-$client->identify(new User(anonId: 'device-123', loginId: 'user-123'));
-```
-
-### Track Custom Event
-
-```php
-$client->trackEvent($user, 'CheckoutStarted', [
-    'cart_value' => 199.0,
-    'currency' => 'CNY',
-]);
-```
-
-### Track with Full Event Structure
-
-```php
-use SensorsWave\Model\Event;
-use SensorsWave\Model\Properties;
-
-$event = Event::create('device-123', 'user-123', 'PurchaseCompleted')
-    ->withProperties(
-        Properties::create()
-            ->set('order_id', 'O-1001')
-            ->set('amount', 199.0)
-    );
-
-$client->track($event);
-```
-
-## User Profile Management
-
-### Set Properties
-
-```php
-$client->profileSet($user, ['plan' => 'pro']);
-```
-
-### Set Once
-
-```php
-$client->profileSetOnce($user, ['first_plan' => 'starter']);
-```
-
-### Increment
-
-```php
-$client->profileIncrement($user, ['coins' => 3]);
-```
-
-### Append
-
-```php
-$client->profileAppend($user, ['tags' => ['php', 'sdk']]);
-```
-
-### Union
-
-```php
-$client->profileUnion($user, ['groups' => ['beta', 'internal', 'beta']]);
-```
-
-### Unset
-
-```php
-$client->profileUnset($user, 'legacy_field', 'stale_flag');
-```
-
-### Delete Profile
-
-```php
-$client->profileDelete($user);
-```
-
-## A/B Testing
-
-### Feature Gate
-
-```php
-$passed = $client->checkFeatureGate($user, 'checkout_enabled');
-```
-
-### Feature Config
-
-```php
-$result = $client->getFeatureConfig($user, 'checkout_theme');
-$theme = $result->getString('color', 'blue');
-```
-
-### Experiment
-
-```php
-$result = $client->getExperiment($user, 'pricing_experiment');
-$variant = $result->variantId;
-```
-
-### Read Variant Payloads
-
-```php
-$payload = $result->getMap('layout', []);
-$json = $result->jsonPayload();
-```
-
-## Configuration Options
-
-### Client Config
+### Client config
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `trackUriPath` | string | `/in/track` | Event tracking path |
-| `flushIntervalMs` | int | `10000` | Opportunistic flush interval |
-| `httpConcurrency` | int | `1` | Max concurrent HTTP requests |
-| `httpTimeoutMs` | int | `3000` | Per-request timeout |
-| `httpRetry` | int | `2` | Retry attempts |
-| `onTrackFailHandler` | callable | `null` | Tracking failure callback |
-| `ab` | `?ABConfig` | `null` | A/B testing configuration |
-| `transport` | `?TransportInterface` | `null` | Custom transport implementation |
+| `trackUriPath` | string | `/in/track` | Event delivery path used by the send worker |
+| `flushIntervalMs` | int | `10000` | In-memory batch rollover interval |
+| `httpConcurrency` | int | `1` | Worker-side request concurrency setting |
+| `httpTimeoutMs` | int | `3000` | Worker-side request timeout |
+| `httpRetry` | int | `2` | Worker-side retry attempts |
+| `eventQueue` | `EventQueueInterface` | local file queue | Queue used by request-path tracking APIs |
+| `onTrackFailHandler` | callable | `null` | Failure callback when queue writes fail |
+| `ab` | `?ABConfig` | `null` | A/B configuration |
+| `transport` | `?TransportInterface` | `null` | Worker-side custom transport implementation |
 | `logger` | `?LoggerInterface` | default logger | Custom logger |
 
 ### ABConfig
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `projectSecret` | string | — | Project secret for signed metadata requests |
-| `metaEndpoint` | string | main endpoint | Metadata endpoint override |
+| `projectSecret` | string | `''` | Project secret used by the sync worker |
+| `metaEndpoint` | string | main endpoint | Metadata endpoint override for the sync worker |
 | `metaUriPath` | string | `/ab/all4eval` | Metadata request path |
-| `metaLoadIntervalMs` | int | `60000` | Refresh interval; minimum `30000` |
+| `metaLoadIntervalMs` | int | `60000` | Snapshot freshness threshold; minimum `30000` |
 | `stickyHandler` | `?StickyHandlerInterface` | `null` | Sticky assignment storage |
-| `metaLoader` | mixed | `null` | Custom metadata loader |
-| `loadABSpecs` | string | `''` | Preloaded metadata snapshot |
+| `loadABSpecs` | string | `''` | Bootstrap snapshot payload |
+| `abSpecStore` | `ABSpecStoreInterface` | local file store | Snapshot store used by the request path |
 
-## Advanced: Caching A/B Specs
+## Default adapters
 
-```php
-$snapshot = $client->getABSpecs();
-file_put_contents(__DIR__ . '/ab-specs.json', $snapshot);
+The SDK ships with these default implementations:
 
-$client = Client::create(
-    'https://collector.example.com',
-    'your-source-token',
-    new Config(
-        ab: new ABConfig(
-            loadABSpecs: file_get_contents(__DIR__ . '/ab-specs.json') ?: '',
-        ),
-    ),
-);
-```
+- `LocalFileABSpecStore`
+- `LocalFileEventQueue`
+- `RedisABSpecStore`
+- `RedisEventQueue`
 
-## Predefined Properties
-
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `$lib` | `php` | SDK language identifier |
-| `$lib_version` | `0.1.3` | SDK version |
-| `$user_set_type` | varies | User profile operation type |
-| `$feature_key` | varies | Feature key in impression payload |
-| `$feature_variant` | varies | Feature variant in impression payload |
-| `$exp_key` | varies | Experiment key in impression payload |
-| `$exp_variant` | varies | Experiment variant in impression payload |
+Redis-backed adapters depend on `RedisClientInterface`, so you can wire the SDK
+to your preferred Redis extension or client library without introducing a hard
+dependency.
 
 ## Development
 

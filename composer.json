@@ -20,6 +20,10 @@
       "SensorsWave\\Tests\\": "tests/"
     }
   },
+  "bin": [
+    "bin/sensorswave-sync",
+    "bin/sensorswave-send"
+  ],
   "scripts": {
     "test": "phpunit",
     "phpstan": "phpstan analyse"

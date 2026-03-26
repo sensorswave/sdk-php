@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace SensorsWave\Config;
 
 use Closure;
+use SensorsWave\Contract\EventQueueInterface;
 use SensorsWave\Contract\LoggerInterface;
 use SensorsWave\Http\TransportInterface;
+use SensorsWave\Storage\LocalFileEventQueue;
 use SensorsWave\Support\DefaultLogger;
 
 /**
@@ -16,6 +18,7 @@ final class Config
 {
     public readonly LoggerInterface $logger;
     public readonly ?Closure $onTrackFailHandler;
+    public readonly EventQueueInterface $eventQueue;
 
     public function __construct(
         ?LoggerInterface $logger = null,
@@ -27,10 +30,12 @@ final class Config
         ?callable $onTrackFailHandler = null,
         public readonly ?ABConfig $ab = null,
         public readonly ?TransportInterface $transport = null,
+        ?EventQueueInterface $eventQueue = null,
     ) {
         $this->logger = $logger ?? new DefaultLogger();
         $this->onTrackFailHandler = $onTrackFailHandler !== null
             ? Closure::fromCallable($onTrackFailHandler)
             : null;
+        $this->eventQueue = $eventQueue ?? new LocalFileEventQueue();
     }
 }

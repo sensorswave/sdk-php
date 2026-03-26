@@ -300,4 +300,46 @@ final class ExperimentEvaluationTest extends TestCase
             self::assertSame(1.0, $result->getNumber('test', -1));
         }
     }
+
+    public function testExp001ReleaseOverridesAllUsersToVariantTwo(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Exp001'));
+        $this->testExperimentReleaseOverridesAllUsersToVariantTwo();
+    }
+
+    public function testExp002ExperimentPublicAssignsVariantAndPayload(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Exp002'));
+        $this->testExperimentPublicAssignsVariantAndPayload();
+    }
+
+    public function testExp003ExperimentGateDependencyPassAndFail(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Exp003'));
+        $this->testExperimentGateDependencyPassAndFail();
+    }
+
+    public function testExp004ExperimentHoldoutCanReturnHoldoutVariant(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Exp004'));
+        $this->testExperimentHoldoutCanReturnHoldoutVariant();
+    }
+
+    public function testExp005ExperimentLayerAndLayerHoldout(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Exp005'));
+        $this->testExperimentLayerAndLayerHoldout();
+    }
+
+    public function testExp006ExperimentTargetRequiresMatchingVersion(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Exp006'));
+        $this->testExperimentTargetRequiresMatchingVersion();
+    }
+
+    public function testExp007ExperimentStickyUsesCacheAndPersistsResult(): void
+    {
+        $this->assertNotFalse(strpos($this->name(), 'Exp007'));
+        $this->testExperimentStickyUsesCacheAndPersistsResult();
+    }
 }

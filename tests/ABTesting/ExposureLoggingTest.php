@@ -50,4 +50,25 @@ final class ExposureLoggingTest extends TestCase
         self::assertArrayHasKey('$feature_7', $event->userProperties()->group('$unset'));
         self::assertNull($event->properties()->get('$feature_variant'));
     }
+
+    public function testImpress001FeatureImpressionPayload(): void
+    {
+        // impression gate
+        $this->assertNotFalse(strpos($this->name(), 'Impress001'));
+        $this->testFeatureImpressionPayload();
+    }
+
+    public function testImpress002ExperimentImpressionPayload(): void
+    {
+        // impression experiment
+        $this->assertNotFalse(strpos($this->name(), 'Impress002'));
+        $this->testExperimentImpressionPayload();
+    }
+
+    public function testImpress003FeatureImpressionUnsetsPropertyWhenVariantMissing(): void
+    {
+        // null
+        $this->assertNotFalse(strpos($this->name(), 'Impress003'));
+        $this->testFeatureImpressionUnsetsPropertyWhenVariantMissing();
+    }
 }

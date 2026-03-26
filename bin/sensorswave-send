@@ -1,0 +1,25 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+use SensorsWave\Config\Config;
+use SensorsWave\Worker\SendCommand;
+
+$endpoint = $argv[1] ?? '';
+$sourceToken = $argv[2] ?? '';
+
+if ($endpoint === '' || $sourceToken === '') {
+    fwrite(STDERR, "Usage: sensorswave-send <endpoint> <sourceToken>\n");
+    exit(1);
+}
+
+$command = new SendCommand(
+    $endpoint,
+    $sourceToken,
+    new Config()
+);
+
+exit($command->run());
