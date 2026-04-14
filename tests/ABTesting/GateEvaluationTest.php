@@ -688,4 +688,79 @@ final class GateEvaluationTest extends TestCase
         $this->assertNotFalse(strpos($this->name(), 'Gate038'));
         $this->testGateHoldoutAndDependentGateFail();
     }
+
+    public function testGateFirstMatchWinsVipPassesViaFirstRule(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+        ));
+
+        $result = $core->evaluate(new User('', 'vip-user-1'), 'gate_first_match', ABCore::TYPE_GATE);
+
+        self::assertTrue($result->checkFeatureGate());
+        self::assertSame('gate-vip-rule', $result->decisionRuleId);
+    }
+
+    public function testGateFirstMatchWinsVipPlusMemberStillMatchesFirst(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+        ));
+
+        $result = $core->evaluate(
+            new User('', 'vip-user-2', Properties::create()->set('is_member', true)),
+            'gate_first_match',
+            ABCore::TYPE_GATE
+        );
+
+        self::assertTrue($result->checkFeatureGate());
+        self::assertSame('gate-vip-rule', $result->decisionRuleId);
+    }
+
+    public function testGateFirstMatchWinsMemberPassesViaSecondRule(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+        ));
+
+        $result = $core->evaluate(
+            new User('', 'regular-member', Properties::create()->set('is_member', true)),
+            'gate_first_match',
+            ABCore::TYPE_GATE
+        );
+
+        self::assertTrue($result->checkFeatureGate());
+        self::assertSame('gate-member-rule', $result->decisionRuleId);
+    }
+
+    public function testGateFirstMatchWinsPlainUserMatchesThirdRuleZeroRolloutFails(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+        ));
+
+        // Rule 1 (VIP): not in list → skip. Rule 2 (Member): not set → skip.
+        // Rule 3 (Public): IS_TRUE matches → rollout=0 → fail. Stops here.
+        $result = $core->evaluate(new User('', 'plain-user'), 'gate_first_match', ABCore::TYPE_GATE);
+
+        self::assertFalse($result->checkFeatureGate());
+        self::assertSame('gate-zero-rollout-rule', $result->decisionRuleId);
+    }
+
+    public function testGateFirstMatchWinsNonMemberMatchesThirdRuleZeroRolloutFails(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+        ));
+
+        // is_member=false → Rule 2 skipped → Rule 3 matches → rollout=0 → fail
+        $result = $core->evaluate(
+            new User('', 'non-member', Properties::create()->set('is_member', false)),
+            'gate_first_match',
+            ABCore::TYPE_GATE
+        );
+
+        self::assertFalse($result->checkFeatureGate());
+        self::assertSame('gate-zero-rollout-rule', $result->decisionRuleId);
+    }
 }

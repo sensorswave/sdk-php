@@ -159,11 +159,14 @@ final class ABCore
     {
         $rules = $spec->rules['OVERRIDE'] ?? [];
         foreach ($rules as $rule) {
-            $pass = $this->evaluateRule($user, $rule, $evalId);
-            if ($pass) {
+            $decision = $this->evaluateRule($user, $rule, $evalId);
+            if ($decision['pass']) {
                 if ($rule->override !== null) {
                     $result->variantId = $rule->override;
                     $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
+                }
+                if ($rule->id !== '') {
+                    $result->decisionRuleId = $rule->id;
                 }
 
                 return true;
@@ -180,11 +183,14 @@ final class ABCore
     {
         $rules = $spec->rules['TRAFFIC'] ?? [];
         foreach ($rules as $rule) {
-            $pass = $this->evaluateRule($user, $rule, $evalId);
-            if (!$pass) {
+            $decision = $this->evaluateRule($user, $rule, $evalId);
+            if (!$decision['pass']) {
                 if ($rule->override !== null) {
                     $result->variantId = $rule->override;
                     $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
+                }
+                if ($rule->id !== '') {
+                    $result->decisionRuleId = $rule->id;
                 }
 
                 return true;
@@ -201,14 +207,17 @@ final class ABCore
     {
         $rules = $spec->rules['GATE'] ?? [];
         foreach ($rules as $rule) {
-            $pass = $this->evaluateRule($user, $rule, $evalId);
-            if ($pass) {
-                if ($rule->override !== null) {
+            $decision = $this->evaluateRule($user, $rule, $evalId);
+            if ($decision['matched']) {
+                if ($rule->id !== '') {
+                    $result->decisionRuleId = $rule->id;
+                }
+                if ($decision['pass'] && $rule->override !== null) {
                     $result->variantId = $rule->override;
                     $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
                 }
 
-                return true;
+                return $decision['pass'];
             }
         }
 
@@ -222,9 +231,13 @@ final class ABCore
     {
         $rules = $spec->rules['GROUP'] ?? [];
         foreach ($rules as $rule) {
-            if ($this->evaluateRule($user, $rule, $evalId) && $rule->override !== null) {
+            $decision = $this->evaluateRule($user, $rule, $evalId);
+            if ($decision['pass'] && $rule->override !== null) {
                 $result->variantId = $rule->override;
                 $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
+                if ($rule->id !== '') {
+                    $result->decisionRuleId = $rule->id;
+                }
                 return;
             }
         }
@@ -232,24 +245,25 @@ final class ABCore
 
     /**
      * 处理单条规则。
+     *
+     * @return array{matched: bool, pass: bool}
      */
-    private function evaluateRule(User $user, Rule $rule, string $evalId): bool
+    private function evaluateRule(User $user, Rule $rule, string $evalId): array
     {
-        if ($rule->rollout === 0.0) {
-            return false;
-        }
-
         foreach ($rule->conditions as $condition) {
             if (!$this->evaluateCondition($user, $condition, $evalId)) {
-                return false;
+                return ['matched' => false, 'pass' => false];
             }
         }
 
         if ($rule->rollout === 100.0) {
-            return true;
+            return ['matched' => true, 'pass' => true];
         }
-
-        return $this->hashModulo($evalId, $rule->salt, 10000) < (int) round($rule->rollout * 100);
+        if ($rule->rollout === 0.0) {
+            return ['matched' => true, 'pass' => false];
+        }
+        $pass = $this->hashModulo($evalId, $rule->salt, 10000) < (int) round($rule->rollout * 100);
+        return ['matched' => true, 'pass' => $pass];
     }
 
     /**

@@ -21,6 +21,7 @@ final class ABResult
         public ?string $variantId = null,
         public array $variantParamValue = [],
         public bool $disableImpress = false,
+        public ?string $decisionRuleId = null,
     ) {
     }
 

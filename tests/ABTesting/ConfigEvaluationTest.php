@@ -13,43 +13,36 @@ use SensorsWave\Tests\Support\MemoryStickyHandler;
 
 final class ConfigEvaluationTest extends TestCase
 {
-    public function testConfigPublicProducesVariantPayload(): void
+    public function testConfigPublicFirstMatchWinsOnlyFirstRuleApplies(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
             dirname(__DIR__) . '/Fixtures/ab/config/public.json'
         ));
 
-        $result = $core->evaluate(new User('', 'config-public-user-1'), 'bMHsfOAUKx', ABCore::TYPE_CONFIG);
-
-        self::assertNotNull($result->variantId);
-        self::assertContains($result->variantId, ['v1', 'v2', 'v3']);
-        self::assertContains($result->getString('color', ''), ['blue', 'red', 'orange']);
-    }
-
-    public function testConfigPublicDistributionMatchesRolloutChain(): void
-    {
-        $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/public.json'
-        ));
-
+        // First-match-wins: all users match rule 1 (IS_TRUE), only ~10% pass rollout → v1.
+        // The remaining ~90% match but fail rollout → gate returns false → no variant.
         $totalUsers = 1000;
-        $counts = [];
+        $v1Count = 0;
+        $nilCount = 0;
+
         for ($index = 0; $index < $totalUsers; $index++) {
             $result = $core->evaluate(
                 new User('', 'config-public-user-' . $index),
                 'bMHsfOAUKx',
                 ABCore::TYPE_CONFIG
             );
-            self::assertNotNull($result->variantId);
-            $counts[$result->variantId] = ($counts[$result->variantId] ?? 0) + 1;
+
+            if ($result->variantId !== null) {
+                self::assertSame('v1', $result->variantId);
+                self::assertSame('blue', $result->getString('color', ''));
+                $v1Count++;
+            } else {
+                $nilCount++;
+            }
         }
 
-        self::assertArrayHasKey('v1', $counts);
-        self::assertArrayHasKey('v2', $counts);
-        self::assertArrayHasKey('v3', $counts);
-        self::assertEqualsWithDelta(0.10, $counts['v1'] / $totalUsers, 0.05);
-        self::assertEqualsWithDelta(0.30, $counts['v2'] / $totalUsers, 0.05);
-        self::assertEqualsWithDelta(0.60, $counts['v3'] / $totalUsers, 0.05);
+        self::assertEqualsWithDelta(0.10, $v1Count / $totalUsers, 0.05);
+        self::assertSame($totalUsers, $v1Count + $nilCount);
     }
 
     public function testConfigOverrideHonorsExplicitUserRule(): void
@@ -89,25 +82,34 @@ final class ConfigEvaluationTest extends TestCase
             dirname(__DIR__) . '/Fixtures/ab/config/holdout.json'
         ));
 
+        // Traffic rule: rollout 90 → ~10% holdout.
+        // First-match-wins gate: all non-holdout users match rule 1 (IS_TRUE), only ~10% pass rollout → v1.
         $totalUsers = 1000;
         $holdoutCount = 0;
-        $variantCount = [];
+        $v1Count = 0;
+        $nilCount = 0;
+
         for ($index = 0; $index < $totalUsers; $index++) {
             $result = $core->evaluate(
                 new User('', 'config-holdout-user-' . $index),
                 'bMHsfOAUKx',
                 ABCore::TYPE_CONFIG
             );
-            self::assertNotNull($result->variantId);
-            if ($result->variantId === 'holdout') {
+
+            if ($result->variantId === null) {
+                $nilCount++;
+            } elseif ($result->variantId === 'holdout') {
                 $holdoutCount++;
-                continue;
+            } else {
+                self::assertSame('v1', $result->variantId);
+                $v1Count++;
             }
-            $variantCount[$result->variantId] = ($variantCount[$result->variantId] ?? 0) + 1;
         }
 
-        self::assertEquals($totalUsers - $holdoutCount, array_sum($variantCount));
         self::assertEqualsWithDelta(0.10, $holdoutCount / $totalUsers, 0.03);
+        $nonHoldout = $totalUsers - $holdoutCount;
+        self::assertEqualsWithDelta(0.10, $v1Count / $nonHoldout, 0.05);
+        self::assertSame($totalUsers, $holdoutCount + $v1Count + $nilCount);
     }
 
     public function testConfigStickyUsesCacheAndPersistsResult(): void
@@ -166,5 +168,79 @@ final class ConfigEvaluationTest extends TestCase
 
         self::assertNotNull($allowed);
         self::assertContains($allowed->getString('color', ''), ['blue', 'red', 'orange']);
+    }
+
+    public function testConfigFirstMatchWinsVipGetsV1(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+        ));
+
+        $result = $core->evaluate(new User('', 'vip-user-1'), 'config_first_match', ABCore::TYPE_CONFIG);
+
+        self::assertSame('v1', $result->variantId);
+        self::assertSame('vip', $result->getString('tier', ''));
+    }
+
+    public function testConfigFirstMatchWinsVipAlsoMemberStillGetsV1(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+        ));
+
+        // VIP user who is also a member → first rule matches → v1 (not v2)
+        $result = $core->evaluate(
+            new User('', 'vip-user-2', Properties::create()->set('is_member', true)),
+            'config_first_match',
+            ABCore::TYPE_CONFIG
+        );
+
+        self::assertSame('v1', $result->variantId);
+        self::assertSame('vip', $result->getString('tier', ''));
+    }
+
+    public function testConfigFirstMatchWinsMemberGetsV2(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+        ));
+
+        $result = $core->evaluate(
+            new User('', 'regular-member', Properties::create()->set('is_member', true)),
+            'config_first_match',
+            ABCore::TYPE_CONFIG
+        );
+
+        self::assertSame('v2', $result->variantId);
+        self::assertSame('member', $result->getString('tier', ''));
+    }
+
+    public function testConfigFirstMatchWinsPublicUserGetsV3(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+        ));
+
+        $result = $core->evaluate(new User('', 'anonymous-user'), 'config_first_match', ABCore::TYPE_CONFIG);
+
+        self::assertSame('v3', $result->variantId);
+        self::assertSame('public', $result->getString('tier', ''));
+    }
+
+    public function testConfigFirstMatchWinsNonMemberFallsToPublic(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+        ));
+
+        // is_member=false → second rule doesn't match → fallback to public rule
+        $result = $core->evaluate(
+            new User('', 'plain-user', Properties::create()->set('is_member', false)),
+            'config_first_match',
+            ABCore::TYPE_CONFIG
+        );
+
+        self::assertSame('v3', $result->variantId);
+        self::assertSame('public', $result->getString('tier', ''));
     }
 }
