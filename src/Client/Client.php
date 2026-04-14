@@ -13,10 +13,6 @@ use InvalidArgumentException;
 use SensorsWave\Config\Config;
 use SensorsWave\Exception\EmptyUserIdsException;
 use SensorsWave\Exception\IdentifyRequiresBothIdsException;
-use SensorsWave\Http\HttpClient;
-use SensorsWave\Http\Request;
-use SensorsWave\Http\Response;
-use SensorsWave\Http\TransportInterface;
 use SensorsWave\Model\Event;
 use SensorsWave\Model\ListProperties;
 use SensorsWave\Model\Properties;
@@ -38,9 +34,6 @@ final class Client
     private const MAX_HTTP_BODY_SIZE = 5 * 1024 * 1024;
 
     private bool $closed = false;
-    private readonly TransportInterface $transport;
-    private readonly string $normalizedEndpoint;
-    private readonly string $normalizedTrackUriPath;
     private ?ABCore $abCore = null;
     private int $metaLoadIntervalMs = 0;
     private ?int $lastMetaLoadAtMs = null;
@@ -55,9 +48,7 @@ final class Client
         private readonly string $sourceToken,
         private readonly Config $config,
     ) {
-        $this->normalizedEndpoint = self::normalizeEndpoint($endpoint);
-        $this->normalizedTrackUriPath = self::normalizeUriPath($config->trackUriPath, '/in/track');
-        $this->transport = $config->transport ?? new HttpClient($config->httpTimeoutMs);
+        self::validateEndpoint($endpoint);
         $this->stickyHandler = $config->ab?->stickyHandler;
         $this->abCore = $this->buildABCore($config);
         register_shutdown_function([$this, 'close']);
@@ -406,68 +397,6 @@ final class Client
     }
 
     /**
-     * 发送埋点请求，并按配置执行重试和失败回调。
-     */
-    private function sendTrackRequest(string $body): void
-    {
-        $request = new Request(
-            'POST',
-            $this->normalizedEndpoint . $this->normalizedTrackUriPath,
-            [
-                'Content-Type' => 'application/json',
-                'SourceToken' => $this->sourceToken,
-            ],
-            $body
-        );
-
-        $attempts = max(0, $this->config->httpRetry) + 1;
-        $lastError = null;
-        $lastStatusCode = null;
-        for ($attempt = 0; $attempt < $attempts; $attempt++) {
-            try {
-                $response = $this->transport->send($request);
-                $lastStatusCode = $response->statusCode;
-                if ($this->isSuccessfulTrackResponse($response)) {
-                    return;
-                }
-
-                if (!$this->isRetryableTrackResponse($response)) {
-                    break;
-                }
-            } catch (\Throwable $throwable) {
-                $lastError = $throwable;
-                $lastStatusCode = null;
-            }
-        }
-
-        $this->config->logger->error(
-            'track request failed',
-            [
-                'source_token' => $this->sourceToken,
-                'status_code' => $lastStatusCode,
-                'error' => $lastError?->getMessage(),
-            ]
-        );
-        $this->notifyTrackFailure($body, $lastError, $lastStatusCode);
-    }
-
-    /**
-     * 判断埋点响应是否成功。
-     */
-    private function isSuccessfulTrackResponse(Response $response): bool
-    {
-        return $response->statusCode === 200;
-    }
-
-    /**
-     * 判断埋点响应是否允许重试。
-     */
-    private function isRetryableTrackResponse(Response $response): bool
-    {
-        return $response->statusCode >= 500;
-    }
-
-    /**
      * 回调通知埋点失败。
      */
     private function notifyTrackFailure(string $body, ?\Throwable $error, ?int $statusCode): void
@@ -578,41 +507,6 @@ final class Client
     }
 
     /**
-     * 归一化 endpoint，仅保留 scheme 与 host。
-     */
-    private static function normalizeEndpoint(string $endpoint): string
-    {
-        $parts = parse_url($endpoint);
-        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
-            throw new InvalidArgumentException('endpoint is invalid');
-        }
-
-        $scheme = $parts['scheme'];
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            throw new InvalidArgumentException('scheme must be http or https');
-        }
-
-        $normalized = $scheme . '://' . $parts['host'];
-        if (isset($parts['port'])) {
-            $normalized .= ':' . $parts['port'];
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * 归一化 URI path。
-     */
-    private static function normalizeUriPath(string $uriPath, string $defaultPath): string
-    {
-        if ($uriPath === '') {
-            return $defaultPath;
-        }
-
-        return str_starts_with($uriPath, '/') ? $uriPath : '/' . $uriPath;
-    }
-
-    /**
      * 在下次求值前按需刷新远程 meta。
      */
     private function ensureABCoreFresh(): void
@@ -684,6 +578,22 @@ final class Client
     private function nowMs(): int
     {
         return (int) floor(microtime(true) * 1000);
+    }
+
+    /**
+     * 校验 endpoint 格式。
+     */
+    private static function validateEndpoint(string $endpoint): void
+    {
+        $parts = parse_url($endpoint);
+        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
+            throw new InvalidArgumentException('endpoint is invalid');
+        }
+
+        $scheme = $parts['scheme'];
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            throw new InvalidArgumentException('scheme must be http or https');
+        }
     }
 
     public function __destruct()
