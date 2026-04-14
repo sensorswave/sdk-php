@@ -23,7 +23,7 @@ final class SendCommand
         private readonly Config $config,
         ?TransportInterface $transport = null,
     ) {
-        $this->transport = $transport ?? $config->transport ?? new HttpClient();
+        $this->transport = $transport ?? $config->transport ?? new HttpClient($config->httpTimeoutMs);
     }
 
     public function run(int $maxItems = 50): int

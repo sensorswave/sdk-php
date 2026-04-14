@@ -57,7 +57,7 @@ final class Client
     ) {
         $this->normalizedEndpoint = self::normalizeEndpoint($endpoint);
         $this->normalizedTrackUriPath = self::normalizeUriPath($config->trackUriPath, '/in/track');
-        $this->transport = $config->transport ?? new HttpClient();
+        $this->transport = $config->transport ?? new HttpClient($config->httpTimeoutMs);
         $this->stickyHandler = $config->ab?->stickyHandler;
         $this->abCore = $this->buildABCore($config);
         register_shutdown_function([$this, 'close']);

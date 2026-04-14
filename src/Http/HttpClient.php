@@ -6,11 +6,17 @@ namespace SensorsWave\Http;
 
 use RuntimeException;
 
-/**
- * 基于 cURL 的默认 HTTP 客户端。
- */
 final class HttpClient implements TransportInterface
 {
+    private readonly int $timeoutMs;
+    private readonly int $connectTimeoutMs;
+
+    public function __construct(int $timeoutMs = 30_000, int $connectTimeoutMs = 5_000)
+    {
+        $this->timeoutMs = $timeoutMs;
+        $this->connectTimeoutMs = $connectTimeoutMs;
+    }
+
     public function send(Request $request): Response
     {
         $ch = curl_init($request->url);
@@ -28,6 +34,8 @@ final class HttpClient implements TransportInterface
             CURLOPT_CUSTOMREQUEST => $request->method,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_POSTFIELDS => $request->body,
+            CURLOPT_TIMEOUT_MS => $this->timeoutMs,
+            CURLOPT_CONNECTTIMEOUT_MS => $this->connectTimeoutMs,
         ]);
 
         $body = curl_exec($ch);

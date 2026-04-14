@@ -763,4 +763,21 @@ final class GateEvaluationTest extends TestCase
         self::assertFalse($result->checkFeatureGate());
         self::assertSame('gate-zero-rollout-rule', $result->decisionRuleId);
     }
+
+    /**
+     * 循环依赖的 gate 不应导致栈溢出，应安全返回 fail。
+     */
+    public function testGateCircularDependencyReturnsFalseWithoutStackOverflow(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/Fixtures/ab/gate/gate_circular.json'
+        ));
+
+        $resultA = $core->evaluate(new User('', 'user-1'), 'Gate_A', ABCore::TYPE_GATE);
+        $resultB = $core->evaluate(new User('', 'user-1'), 'Gate_B', ABCore::TYPE_GATE);
+
+        // 循环依赖达到最大递归深度后返回空结果，gate 失败
+        self::assertFalse($resultA->checkFeatureGate());
+        self::assertFalse($resultB->checkFeatureGate());
+    }
 }

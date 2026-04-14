@@ -21,6 +21,9 @@ final class ABCore
     public const TYPE_GATE = 1;
     public const TYPE_CONFIG = 2;
     public const TYPE_EXPERIMENT = 3;
+    private const MAX_RECURSION_DEPTH = 10;
+
+    private int $evaluationDepth = 0;
 
     public function __construct(
         private Storage $storage,
@@ -90,66 +93,72 @@ final class ABCore
         return $this->storage->updateTime;
     }
 
-    /**
-     * 执行 spec 求值。
-     */
     private function evaluateSpec(User $user, ABSpec $spec): ABResult
     {
-        if (!$spec->enabled) {
+        if ($this->evaluationDepth >= self::MAX_RECURSION_DEPTH) {
             return new ABResult();
         }
+        $this->evaluationDepth++;
 
-        $evalId = $this->getEvalId($user, $spec);
-        if ($evalId === '') {
-            return new ABResult();
-        }
+        try {
+            if (!$spec->enabled) {
+                return new ABResult();
+            }
 
-        $result = new ABResult(
-            id: $spec->id,
-            key: $spec->key,
-            type: $spec->type,
-            disableImpress: $spec->disableImpress,
-        );
-        $stickyKey = null;
+            $evalId = $this->getEvalId($user, $spec);
+            if ($evalId === '') {
+                return new ABResult();
+            }
 
-        if ($spec->sticky && $this->stickyHandler !== null) {
-            $stickyKey = $spec->id . '-' . $evalId;
-            $cached = $this->stickyHandler->getStickyResult($stickyKey);
-            if (is_string($cached) && $cached !== '') {
-                /** @var array<string, mixed> $decoded */
-                $decoded = json_decode($cached, true) ?? [];
-                $variantId = $decoded['v'] ?? null;
-                if (is_string($variantId)) {
-                    $result->variantId = $variantId;
-                    $result->variantParamValue = $spec->variantValues[$variantId] ?? [];
-                    return $result;
+            $result = new ABResult(
+                id: $spec->id,
+                key: $spec->key,
+                type: $spec->type,
+                disableImpress: $spec->disableImpress,
+            );
+            $stickyKey = null;
+
+            if ($spec->sticky && $this->stickyHandler !== null) {
+                $stickyKey = $spec->id . '-' . $evalId;
+                $cached = $this->stickyHandler->getStickyResult($stickyKey);
+                if (is_string($cached) && $cached !== '') {
+                    /** @var array<string, mixed> $decoded */
+                    $decoded = json_decode($cached, true) ?? [];
+                    $variantId = $decoded['v'] ?? null;
+                    if (is_string($variantId)) {
+                        $result->variantId = $variantId;
+                        $result->variantParamValue = $spec->variantValues[$variantId] ?? [];
+                        return $result;
+                    }
                 }
             }
-        }
 
-        $pass = false;
-        if ($this->evaluateOverrideRules($user, $spec, $evalId, $result)) {
-            return $this->finalizeGateResult($spec, $result, true);
-        }
+            $pass = false;
+            if ($this->evaluateOverrideRules($user, $spec, $evalId, $result)) {
+                return $this->finalizeGateResult($spec, $result, true);
+            }
 
-        if ($this->evaluateTrafficRules($user, $spec, $evalId, $result)) {
-            return $this->finalizeGateResult($spec, $result, false);
-        }
+            if ($this->evaluateTrafficRules($user, $spec, $evalId, $result)) {
+                return $this->finalizeGateResult($spec, $result, false);
+            }
 
-        if ($this->evaluateGateRules($user, $spec, $evalId, $result)) {
-            $pass = true;
-        }
+            if ($this->evaluateGateRules($user, $spec, $evalId, $result)) {
+                $pass = true;
+            }
 
-        if ($spec->type === self::TYPE_EXPERIMENT && $pass && $result->variantId === null) {
-            $this->evaluateGroupRules($user, $spec, $evalId, $result);
-        }
+            if ($spec->type === self::TYPE_EXPERIMENT && $pass && $result->variantId === null) {
+                $this->evaluateGroupRules($user, $spec, $evalId, $result);
+            }
 
-        $result = $this->finalizeGateResult($spec, $result, $pass);
-        if ($stickyKey !== null && $result->variantId !== null) {
-            $this->stickyHandler?->setStickyResult($stickyKey, json_encode(['v' => $result->variantId], JSON_THROW_ON_ERROR));
-        }
+            $result = $this->finalizeGateResult($spec, $result, $pass);
+            if ($stickyKey !== null && $result->variantId !== null) {
+                $this->stickyHandler?->setStickyResult($stickyKey, json_encode(['v' => $result->variantId], JSON_THROW_ON_ERROR));
+            }
 
-        return $result;
+            return $result;
+        } finally {
+            $this->evaluationDepth--;
+        }
     }
 
     /**
