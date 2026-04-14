@@ -9,15 +9,19 @@ use RuntimeException;
 use SensorsWave\Contract\EventQueueInterface;
 use SensorsWave\Contract\RedisClientInterface;
 
-/**
- * 基于 Redis 的事件队列。
- */
 final class RedisEventQueue implements EventQueueInterface
 {
+    /**
+     * 默认 claim TTL：1 小时。如果 worker 崩溃，claim 过期后自动清理，
+     * 避免永久残留。
+     */
+    private const DEFAULT_CLAIM_TTL_SECONDS = 3600;
+
     public function __construct(
         private readonly RedisClientInterface $redis,
         private readonly string $queueKey = 'sensorswave:event_queue',
         private readonly string $claimPrefix = 'sensorswave:event_claim:',
+        private readonly int $claimTtlSeconds = self::DEFAULT_CLAIM_TTL_SECONDS,
     ) {
     }
 
@@ -57,7 +61,7 @@ final class RedisEventQueue implements EventQueueInterface
             ? array_slice($decoded['events'], 0, max(1, $maxItems))
             : [];
 
-        $this->redis->set($this->claimPrefix . $batchId, $payload);
+        $this->redis->setEx($this->claimPrefix . $batchId, $payload, $this->claimTtlSeconds);
 
         return new EventBatch($batchId, $events);
     }

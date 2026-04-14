@@ -13,6 +13,8 @@ interface RedisClientInterface
 
     public function set(string $key, string $value): bool;
 
+    public function setEx(string $key, string $value, int $ttlSeconds): bool;
+
     public function del(string ...$keys): int;
 
     public function lPush(string $key, string ...$values): int;

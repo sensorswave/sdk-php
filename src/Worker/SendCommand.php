@@ -35,6 +35,18 @@ final class SendCommand
                 return $status;
             }
 
+            try {
+                $body = json_encode($batch->events, JSON_THROW_ON_ERROR);
+            } catch (\JsonException $exception) {
+                $this->config->logger->error(
+                    'failed to encode event batch, discarding',
+                    ['batch_id' => $batch->batchId, 'error' => $exception->getMessage()]
+                );
+                $this->config->eventQueue->ack($batch->batchId);
+                $status = 1;
+                continue;
+            }
+
             $request = new Request(
                 'POST',
                 $this->normalizeEndpoint($this->endpoint) . $this->normalizeUriPath($this->config->trackUriPath, '/in/track'),
@@ -42,7 +54,7 @@ final class SendCommand
                     'Content-Type' => 'application/json',
                     'SourceToken' => $this->sourceToken,
                 ],
-                json_encode($batch->events, JSON_THROW_ON_ERROR)
+                $body
             );
 
             if ($this->deliver($request)) {
