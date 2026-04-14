@@ -435,6 +435,30 @@ Redis-backed adapters depend on `RedisClientInterface`, so you can wire the SDK 
 
 ---
 
+## Running the Examples
+
+Track / Identify / ProfileSet example:
+
+```bash
+php example/track_example.php \
+    --source-token=your_token \
+    --endpoint=your_event_tracking_endpoint
+```
+
+A/B testing example:
+
+```bash
+php example/ab_example.php \
+    --source-token=your_token \
+    --project-secret=your_secret \
+    --endpoint=your_event_tracking_endpoint \
+    --gate-key=my_feature_gate \
+    --experiment-key=my_experiment \
+    --feature-config-key=my_feature_config
+```
+
+---
+
 ## Development
 
 ```bash
