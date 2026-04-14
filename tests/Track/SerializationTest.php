@@ -36,7 +36,7 @@ final class SerializationTest extends TestCase
         self::assertSame('user_set', $event->properties()->get('$user_set_type'));
         self::assertSame('pro', $event->userProperties()->group('$set')['plan']);
         self::assertSame('php', $event->properties()->get('$lib'));
-        self::assertSame('0.1.3', $event->properties()->get('$lib_version'));
+        self::assertSame(\SensorsWave\Support\SDKInfo::VERSION, $event->properties()->get('$lib_version'));
     }
 
     public function testEventSerializerProducesExpectedJsonShape(): void
@@ -52,7 +52,7 @@ final class SerializationTest extends TestCase
         self::assertSame('user-456', $decoded['login_id']);
         self::assertSame('TestEvent', $decoded['event']);
         self::assertSame('php', $decoded['properties']['$lib']);
-        self::assertSame('0.1.3', $decoded['properties']['$lib_version']);
+        self::assertSame(\SensorsWave\Support\SDKInfo::VERSION, $decoded['properties']['$lib_version']);
         self::assertSame('test_value', $decoded['properties']['test_key']);
     }
 

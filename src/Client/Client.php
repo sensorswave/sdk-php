@@ -35,7 +35,6 @@ final class Client
 
     private bool $closed = false;
     private ?ABCore $abCore = null;
-    private int $metaLoadIntervalMs = 0;
     private ?int $lastMetaLoadAtMs = null;
     private readonly ?\SensorsWave\Contract\StickyHandlerInterface $stickyHandler;
     /** @var list<string> */
@@ -324,10 +323,6 @@ final class Client
             return null;
         }
 
-        $this->metaLoadIntervalMs = $config->ab->metaLoadIntervalMs < 30_000
-            ? 30_000
-            : $config->ab->metaLoadIntervalMs;
-
         if ($config->ab->loadABSpecs !== '') {
             try {
                 $config->ab->abSpecStore->save($config->ab->loadABSpecs);
@@ -511,7 +506,7 @@ final class Client
      */
     private function ensureABCoreFresh(): void
     {
-        if ($this->config->ab === null || $this->metaLoadIntervalMs === 0) {
+        if ($this->config->ab === null) {
             return;
         }
 
@@ -530,12 +525,9 @@ final class Client
 
             $metadata = $this->config->ab->abSpecStore->metadata();
             if ($metadata->updatedAtMs === null) {
-                $this->abCore = null;
-                return null;
-            }
-
-            if ($this->nowMs() - $metadata->updatedAtMs > $this->metaLoadIntervalMs) {
-                $this->abCore = null;
+                if ($this->abCore !== null) {
+                    return $this->abCore;
+                }
                 return null;
             }
 

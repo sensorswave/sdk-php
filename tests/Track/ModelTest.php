@@ -22,7 +22,7 @@ final class ModelTest extends TestCase
         $event->normalize();
 
         self::assertSame('php', $event->properties()->get('$lib'));
-        self::assertSame('0.1.3', $event->properties()->get('$lib_version'));
+        self::assertSame(\SensorsWave\Support\SDKInfo::VERSION, $event->properties()->get('$lib_version'));
         self::assertSame('value', $event->properties()->get('custom_prop'));
         self::assertNotSame('', $event->traceId());
         self::assertGreaterThan(0, $event->time());

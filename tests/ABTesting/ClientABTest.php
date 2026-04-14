@@ -109,9 +109,10 @@ final class ClientABTest extends TestCase
         self::assertNull($client->getExperiment(new User('', 'user-pass'), 'TestSpec')->variantId);
     }
 
-    public function testClientFailsClosedWhenLocalSnapshotIsStale(): void
+    public function testClientUsesSnapshotRegardlessOfAge(): void
     {
         $snapshot = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
+        // snapshot 即使是 61 秒前写入的也应正常使用，不做过期判定
         $store = new MemoryABSpecStore($snapshot, ((int) floor(microtime(true) * 1000)) - 61_000);
         $client = Client::create(
             'https://collector.example.com',
@@ -120,13 +121,11 @@ final class ClientABTest extends TestCase
                 eventQueue: new MemoryEventQueue(),
                 ab: new ABConfig(
                     abSpecStore: $store,
-                    metaLoadIntervalMs: 60_000,
                 )
             )
         );
 
-        self::assertFalse($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
-        self::assertNull($client->getFeatureConfig(new User('', 'user-pass'), 'TestSpec')->variantId);
+        self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
     }
 
     public function testClientCanExportABSpecsSnapshotFromStore(): void
