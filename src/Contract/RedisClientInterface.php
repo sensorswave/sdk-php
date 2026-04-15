@@ -26,6 +26,13 @@ interface RedisClientInterface
     public function lPop(string $key): string|false|null;
 
     /**
+     * @return list<string>
+     */
+    public function lRange(string $key, int $start, int $stop): array;
+
+    public function lTrim(string $key, int $start, int $stop): bool;
+
+    /**
      * 执行 Lua 脚本。
      *
      * @param string   $script Lua 脚本内容

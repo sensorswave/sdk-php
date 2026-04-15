@@ -3,3 +3,5 @@
 /.phpunit.result.cache
 .idea
 .serena
+.phpactor.json
+package.xml

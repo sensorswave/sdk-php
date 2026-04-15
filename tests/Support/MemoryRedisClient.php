@@ -78,25 +78,57 @@ final class MemoryRedisClient implements RedisClientInterface
         return array_shift($this->lists[$key]);
     }
 
+    public function lRange(string $key, int $start, int $stop): array
+    {
+        $list = $this->lists[$key] ?? [];
+        $len  = count($list);
+        if ($len === 0) {
+            return [];
+        }
+        $stop = $stop < 0 ? $len + $stop : $stop;
+        return array_values(array_slice($list, $start, $stop - $start + 1));
+    }
+
+    public function lTrim(string $key, int $start, int $stop): bool
+    {
+        $list = $this->lists[$key] ?? [];
+        $len  = count($list);
+        if ($len === 0) {
+            return true;
+        }
+        $stop = $stop < 0 ? $len + $stop : $stop;
+        $this->lists[$key] = array_values(array_slice($list, $start, $stop - $start + 1));
+        return true;
+    }
+
     public function eval(string $script, array $keys = [], array $args = []): mixed
     {
-        // 模拟 LUA_DEQUEUE: LPOP KEYS[1] → SETEX KEYS[2] ARGV[1] payload
-        if (str_contains($script, 'LPOP') && str_contains($script, 'SETEX')) {
-            $payload = $this->lPop($keys[0]);
-            if ($payload === null) {
+        // 模拟 LUA_DEQUEUE: LRANGE + LTRIM + SETEX
+        if (str_contains($script, 'LRANGE') && str_contains($script, 'LTRIM')) {
+            $maxBatches = (int) $args[0];
+            $ttl        = (int) $args[1];
+            $items      = $this->lRange($keys[0], 0, $maxBatches - 1);
+            if ($items === []) {
                 return false;
             }
-            $this->setEx($keys[1], $payload, (int) $args[0]);
+            $this->lTrim($keys[0], $maxBatches, -1);
+            $payload = json_encode($items);
+            $this->setEx($keys[1], $payload, $ttl);
             return $payload;
         }
 
-        // 模拟 LUA_NACK: GET KEYS[0] → LPUSH KEYS[1] → DEL KEYS[0]
-        if (str_contains($script, 'GET') && str_contains($script, 'LPUSH')) {
+        // 模拟 LUA_NACK: GET KEYS[0] → LPUSH items 逐条 → DEL KEYS[0]
+        if (str_contains($script, 'cjson.decode') && str_contains($script, 'LPUSH')) {
             $payload = $this->get($keys[0]);
             if ($payload === null) {
                 return 0;
             }
-            $this->lPush($keys[1], $payload);
+            $items = json_decode($payload, true);
+            if (is_array($items)) {
+                for ($i = count($items) - 1; $i >= 0; $i--) {
+                    $this->lPush($keys[1], $items[$i]);
+                }
+            }
             $this->del($keys[0]);
             return 1;
         }
