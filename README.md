@@ -435,6 +435,124 @@ Redis-backed adapters depend on `RedisClientInterface`, so you can wire the SDK 
 
 ---
 
+## Custom Adapters
+
+If the built-in file/Redis adapters don't fit your infrastructure, you can implement your own by fulfilling two interfaces: `ABSpecStoreInterface` and `EventQueueInterface`.
+
+### ABSpecStoreInterface
+
+Manages persistent storage for A/B snapshots. The sync worker calls `save()` to write, and the request-path client calls `load()` / `metadata()` to read.
+
+```php
+use SensorsWave\Contract\ABSpecStoreInterface;
+use SensorsWave\Storage\ABSpecStoreMetadata;
+
+interface ABSpecStoreInterface
+{
+    /**
+     * Load the most recently saved snapshot JSON string.
+     * Return null when no data is available — the SDK will skip A/B evaluation.
+     */
+    public function load(): ?string;
+
+    /**
+     * Persist the snapshot JSON string (called by the sync worker, never on the request path).
+     */
+    public function save(string $snapshot): void;
+
+    /**
+     * Return snapshot metadata. updatedAtMs is the millisecond timestamp of the last save;
+     * the SDK uses it to determine data freshness. Pass null when no data is available.
+     */
+    public function metadata(): ABSpecStoreMetadata;
+}
+```
+
+**Implementation notes:**
+
+- `load()` must return the exact string that was passed to `save()` — do not re-encode or transform it
+- `updatedAtMs` in `metadata()` should be a millisecond timestamp captured at `save()` time — e.g. `(int)(microtime(true) * 1000)`
+- The implementation must be process-safe — request-path FPM processes and the sync worker may read/write concurrently
+
+### EventQueueInterface
+
+Manages event buffering between the request path and the send worker using a claim-based delivery model:
+
+```
+enqueue() ──→ pending ──→ dequeue() ──→ claimed (in-flight)
+                 ↑                          │
+                 │          ack()  ←── ok  ─┤
+                 └── nack() ←───── fail ───┘
+```
+
+```php
+use SensorsWave\Contract\EventQueueInterface;
+use SensorsWave\Storage\EventBatch;
+
+interface EventQueueInterface
+{
+    /**
+     * Write an array of events into the queue.
+     * Called on the request path — should return as fast as possible.
+     *
+     * @param list<array<string, mixed>> $events
+     */
+    public function enqueue(array $events): void;
+
+    /**
+     * Pop up to $maxItems events as a single batch.
+     * The batch should be marked as "claimed" to prevent duplicate consumption.
+     * Return null when the queue is empty.
+     */
+    public function dequeue(int $maxItems): ?EventBatch;
+
+    /**
+     * Confirm successful delivery — remove the claimed batch.
+     */
+    public function ack(string $batchId): void;
+
+    /**
+     * Delivery failed — return the batch to the queue for retry.
+     */
+    public function nack(string $batchId): void;
+}
+```
+
+**Implementation notes:**
+
+- `enqueue()` runs inside PHP-FPM request handling — avoid expensive I/O (network round-trips, synchronous disk flushes, etc.)
+- `dequeue()` returns an `EventBatch` containing a `batchId` (unique identifier) and an `events` array
+- Claimed batches should have an expiration mechanism (e.g. TTL in Redis, scheduled cleanup in a database) so they are automatically recovered if a worker crashes
+- `ack()` / `nack()` will be called at most once for each `batchId`
+
+### Wiring Custom Adapters
+
+Pass your implementations via the `Config` and `ABConfig` constructors:
+
+```php
+use SensorsWave\Client\Client;
+use SensorsWave\Config\Config;
+use SensorsWave\Config\ABConfig;
+
+$client = Client::create(
+    'https://your-endpoint.com',
+    'your-source-token',
+    new Config(
+        eventQueue: new YourEventQueue(/* ... */),
+        ab: new ABConfig(
+            projectSecret: 'your-project-secret',
+            abSpecStore:   new YourABSpecStore(/* ... */),
+        ),
+    ),
+);
+```
+
+> **Important**: The request-path client and its corresponding worker must share the same storage backend:
+> - `ABSpecStoreInterface` — written by `sensorswave-sync`, read by the request-path client
+> - `EventQueueInterface` — written by the request-path client, read by `sensorswave-send`
+
+---
+
 ## Running the Examples
 
 Track / Identify / ProfileSet example:
