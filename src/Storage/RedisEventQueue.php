@@ -17,10 +17,40 @@ final class RedisEventQueue implements EventQueueInterface
      */
     private const DEFAULT_CLAIM_TTL_SECONDS = 3600;
 
+    /**
+     * Lua: 原子 dequeue。
+     * KEYS[1] = queueKey, KEYS[2] = claimKey（调用时动态拼接）
+     * ARGV[1] = claimTtlSeconds
+     * 返回 payload 字符串或 false。
+     */
+    private const LUA_DEQUEUE = <<<'LUA'
+        local payload = redis.call('LPOP', KEYS[1])
+        if not payload then
+            return false
+        end
+        redis.call('SETEX', KEYS[2], ARGV[1], payload)
+        return payload
+        LUA;
+
+    /**
+     * Lua: 原子 nack。
+     * KEYS[1] = claimKey, KEYS[2] = queueKey
+     * 返回 1（成功）或 0（claim 已过期）。
+     */
+    private const LUA_NACK = <<<'LUA'
+        local payload = redis.call('GET', KEYS[1])
+        if not payload then
+            return 0
+        end
+        redis.call('LPUSH', KEYS[2], payload)
+        redis.call('DEL', KEYS[1])
+        return 1
+        LUA;
+
     public function __construct(
         private readonly RedisClientInterface $redis,
-        private readonly string $queueKey = 'sensorswave:event_queue',
-        private readonly string $claimPrefix = 'sensorswave:event_claim:',
+        private readonly string $queueKey = '{sensorswave}:event_queue',
+        private readonly string $claimPrefix = '{sensorswave}:event_claim:',
         private readonly int $claimTtlSeconds = self::DEFAULT_CLAIM_TTL_SECONDS,
     ) {
     }
@@ -41,7 +71,16 @@ final class RedisEventQueue implements EventQueueInterface
 
     public function dequeue(int $maxItems): ?EventBatch
     {
-        $payload = $this->redis->lPop($this->queueKey);
+        $batchId = uniqid('batch-', true);
+        $claimKey = $this->claimPrefix . $batchId;
+
+        /** @var string|false $payload */
+        $payload = $this->redis->eval(
+            self::LUA_DEQUEUE,
+            [$this->queueKey, $claimKey],
+            [$this->claimTtlSeconds],
+        );
+
         if (!is_string($payload) || $payload === '') {
             return null;
         }
@@ -53,15 +92,10 @@ final class RedisEventQueue implements EventQueueInterface
             throw new RuntimeException('failed to decode Redis event batch', 0, $exception);
         }
 
-        $batchId = is_string($decoded['batch_id'] ?? null)
-            ? $decoded['batch_id']
-            : uniqid('batch-', true);
         /** @var list<array<string, mixed>> $events */
         $events = is_array($decoded['events'] ?? null)
             ? array_slice($decoded['events'], 0, max(1, $maxItems))
             : [];
-
-        $this->redis->setEx($this->claimPrefix . $batchId, $payload, $this->claimTtlSeconds);
 
         return new EventBatch($batchId, $events);
     }
@@ -74,12 +108,10 @@ final class RedisEventQueue implements EventQueueInterface
     public function nack(string $batchId): void
     {
         $claimKey = $this->claimPrefix . $batchId;
-        $payload = $this->redis->get($claimKey);
-        if (!is_string($payload) || $payload === '') {
-            return;
-        }
 
-        $this->redis->lPush($this->queueKey, $payload);
-        $this->redis->del($claimKey);
+        $this->redis->eval(
+            self::LUA_NACK,
+            [$claimKey, $this->queueKey],
+        );
     }
 }

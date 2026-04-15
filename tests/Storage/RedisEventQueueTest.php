@@ -26,7 +26,7 @@ final class RedisEventQueueTest extends TestCase
         self::assertSame('Purchase', $batch->events[0]['event']);
 
         // claim 应存在且有 TTL
-        $claimKey = 'sensorswave:event_claim:' . $batch->batchId;
+        $claimKey = '{sensorswave}:event_claim:' . $batch->batchId;
         self::assertArrayHasKey($claimKey, $redis->store);
         self::assertArrayHasKey($claimKey, $redis->ttls);
         self::assertSame(3600, $redis->ttls[$claimKey]);
@@ -53,7 +53,7 @@ final class RedisEventQueueTest extends TestCase
         $queue->nack($batch->batchId);
 
         // claim 应被删除
-        $claimKey = 'sensorswave:event_claim:' . $batch->batchId;
+        $claimKey = '{sensorswave}:event_claim:' . $batch->batchId;
         self::assertArrayNotHasKey($claimKey, $redis->store);
 
         // 重新 dequeue 应能取到
@@ -74,7 +74,7 @@ final class RedisEventQueueTest extends TestCase
         $batch = $queue->dequeue(50);
         self::assertNotNull($batch);
 
-        $claimKey = 'sensorswave:event_claim:' . $batch->batchId;
+        $claimKey = '{sensorswave}:event_claim:' . $batch->batchId;
         self::assertSame(300, $redis->ttls[$claimKey]);
     }
 }

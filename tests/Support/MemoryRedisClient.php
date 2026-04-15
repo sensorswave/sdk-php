@@ -77,4 +77,30 @@ final class MemoryRedisClient implements RedisClientInterface
         }
         return array_shift($this->lists[$key]);
     }
+
+    public function eval(string $script, array $keys = [], array $args = []): mixed
+    {
+        // 模拟 LUA_DEQUEUE: LPOP KEYS[1] → SETEX KEYS[2] ARGV[1] payload
+        if (str_contains($script, 'LPOP') && str_contains($script, 'SETEX')) {
+            $payload = $this->lPop($keys[0]);
+            if ($payload === null) {
+                return false;
+            }
+            $this->setEx($keys[1], $payload, (int) $args[0]);
+            return $payload;
+        }
+
+        // 模拟 LUA_NACK: GET KEYS[0] → LPUSH KEYS[1] → DEL KEYS[0]
+        if (str_contains($script, 'GET') && str_contains($script, 'LPUSH')) {
+            $payload = $this->get($keys[0]);
+            if ($payload === null) {
+                return 0;
+            }
+            $this->lPush($keys[1], $payload);
+            $this->del($keys[0]);
+            return 1;
+        }
+
+        return false;
+    }
 }
