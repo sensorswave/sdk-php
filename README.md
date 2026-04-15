@@ -373,11 +373,19 @@ switch ($strategy) {
 | `httpConcurrency` | `int` | `1` | Worker-side request concurrency |
 | `httpTimeoutMs` | `int` | `3000` | Worker-side request timeout (ms) |
 | `httpRetry` | `int` | `2` | Worker-side retry attempts |
-| `eventQueue` | `EventQueueInterface` | Local file queue | Queue used by request-path tracking APIs |
-| `onTrackFailHandler` | `?callable` | `null` | Failure callback when queue writes fail |
+| `eventQueue` | `EventQueueInterface` | Local file queue ⚠️ | Queue used by request-path tracking APIs |
+| `onTrackFailHandler` | `?callable` | `null` ⚠️ | Failure callback when queue writes fail |
 | `ab` | `?ABConfig` | `null` | A/B configuration (disabled by default) |
 | `transport` | `?TransportInterface` | `null` | Worker-side custom transport |
-| `logger` | `?LoggerInterface` | Default logger | Custom logger |
+| `logger` | `?LoggerInterface` | Default logger ⚠️ | Custom logger |
+
+> ⚠️ **Production Notice**
+>
+> The following fields ship with minimal default implementations intended for local development and testing only. They are **not recommended for production use** — you should provide your own implementations:
+>
+> - **`eventQueue`** — Default `LocalFileEventQueue` uses the system temp directory. In multi-instance or containerized deployments, each process has its own isolated queue, and data may be lost on restart. Replace with a shared backend (e.g. Redis, database).
+> - **`onTrackFailHandler`** — Default `null` silently discards failures. In production you should register a callback to log or alert on queue write errors, otherwise data loss goes unnoticed.
+> - **`logger`** — Default `DefaultLogger` only outputs `warn` and `error` to `error_log`, with `debug` and `info` silenced. Replace with your logging framework (e.g. Monolog) for full observability.
 
 ### ABConfig
 
@@ -389,7 +397,11 @@ switch ($strategy) {
 | `metaLoadIntervalMs` | `int` | `60000` | Snapshot freshness threshold (minimum `30000`) |
 | `stickyHandler` | `?StickyHandlerInterface` | `null` | Sticky assignment storage |
 | `loadABSpecs` | `string` | `''` | Bootstrap snapshot payload |
-| `abSpecStore` | `ABSpecStoreInterface` | Local file store | Snapshot store used by the request path |
+| `abSpecStore` | `ABSpecStoreInterface` | Local file store ⚠️ | Snapshot store used by the request path |
+
+> ⚠️ **Production Notice**
+>
+> - **`abSpecStore`** — Default `LocalFileABSpecStore` stores snapshots in the system temp directory. In multi-instance or containerized deployments, each process reads its own isolated copy, leading to inconsistent A/B evaluations. Replace with a shared backend (e.g. Redis, database).
 
 ---
 
@@ -432,6 +444,8 @@ The SDK ships with pluggable adapters:
 | `RedisEventQueue` | Redis-backed event queue |
 
 Redis-backed adapters depend on `RedisClientInterface`, so you can wire the SDK to your preferred Redis extension or client library without introducing a hard dependency.
+
+> **Note**: The built-in `LocalFile*` and `Redis*` adapters (`LocalFileABSpecStore`, `LocalFileEventQueue`, `RedisABSpecStore`, `RedisEventQueue`) are **reference implementations** provided for convenience. They may not suit every production environment. You should evaluate them against your project's requirements and either adapt them or implement your own `ABSpecStoreInterface` / `EventQueueInterface` as needed. See [Custom Adapters](#custom-adapters) below for details.
 
 ---
 
@@ -478,11 +492,22 @@ interface ABSpecStoreInterface
 
 Manages event buffering between the request path and the send worker using a claim-based delivery model:
 
-```
-enqueue() ──→ pending ──→ dequeue() ──→ claimed (in-flight)
-                 ↑                          │
-                 │          ack()  ←── ok  ─┤
-                 └── nack() ←───── fail ───┘
+```mermaid
+flowchart LR
+    enqueue["📥 enqueue()"] --> pending["📦 pending"]
+    pending --> dequeue["📤 dequeue()"] --> claimed["⚙️ claimed<br>(in-flight)"]
+    claimed -- "✅ ok" --> ack["✅ ack()"]
+    claimed -- "❌ fail" --> nack["♻️ nack()"] --> pending
+
+    classDef method fill:#87CEEB,stroke:#333,stroke-width:2px,color:darkblue
+    classDef state fill:#E6E6FA,stroke:#333,stroke-width:2px,color:darkblue
+    classDef success fill:#90EE90,stroke:#2E7D2E,stroke-width:2px,color:darkgreen
+    classDef retry fill:#FFD700,stroke:#333,stroke-width:2px,color:black
+
+    class enqueue,dequeue method
+    class pending,claimed state
+    class ack success
+    class nack retry
 ```
 
 ```php
