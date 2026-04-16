@@ -70,6 +70,8 @@ final class RedisEventQueue implements EventQueueInterface
 
     public function dequeue(int $limit): array
     {
+        $limit = max(1, $limit);
+
         $receipt  = uniqid('rcpt-', true);
         $claimKey = $this->claimPrefix . $receipt;
 

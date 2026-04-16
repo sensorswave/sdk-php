@@ -47,7 +47,7 @@ final class MemoryEventQueue implements EventQueueInterface
     public function nack(array $messages): void
     {
         $receipts = [];
-        foreach ($messages as $message) {
+        foreach (array_reverse($messages) as $message) {
             $receipts[] = $message->receipt;
             array_unshift($this->queued, $message->payload);
         }
