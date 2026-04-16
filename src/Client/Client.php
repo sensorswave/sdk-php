@@ -48,7 +48,7 @@ final class Client
     ) {
         self::validateEndpoint($endpoint);
         $this->stickyHandler = $config->ab?->stickyHandler;
-        $this->abCore = $this->buildABCore($config);
+        $this->abCore = $this->refreshABCore(true);
         register_shutdown_function([$this, 'close']);
     }
 
@@ -313,13 +313,7 @@ final class Client
         }
     }
 
-    /**
-     * 构建 A/B core。
-     */
-    private function buildABCore(Config $config): ?ABCore
-    {
-        return $this->refreshABCore(true);
-    }
+    
 
     /**
      * 获取已初始化的 A/B core。
