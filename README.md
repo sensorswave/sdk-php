@@ -1,5 +1,12 @@
 # SensorsWave PHP SDK
 
+[![Release](https://img.shields.io/github/v/release/sensorswave/sdk-php.svg)](https://github.com/sensorswave/sdk-php/releases)
+[![PHP](https://img.shields.io/badge/php-%5E8.2-8892BF)](https://www.php.net/)
+[![Test](https://github.com/sensorswave/sdk-php/actions/workflows/test.yml/badge.svg)](https://github.com/sensorswave/sdk-php/actions/workflows/test.yml)
+[![Lint](https://github.com/sensorswave/sdk-php/actions/workflows/lint.yml/badge.svg)](https://github.com/sensorswave/sdk-php/actions/workflows/lint.yml)
+[![Security](https://github.com/sensorswave/sdk-php/actions/workflows/security.yml/badge.svg)](https://github.com/sensorswave/sdk-php/actions/workflows/security.yml)
+[![License](https://img.shields.io/github/license/sensorswave/sdk-php.svg)](https://github.com/sensorswave/sdk-php/blob/master/LICENSE)
+
 **English** | [中文](README.zh-CN.md)
 
 A lightweight PHP SDK for event tracking and A/B testing, designed for PHP/FPM environments.
