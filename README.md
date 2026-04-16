@@ -558,43 +558,51 @@ flowchart LR
 
 ```php
 use SensorsWave\Contract\EventQueueInterface;
-use SensorsWave\Storage\EventBatch;
+use SensorsWave\Storage\QueueMessage;
 
 interface EventQueueInterface
 {
     /**
-     * Write an array of events into the queue.
+     * Write raw JSON payloads into the queue.
      * Called on the request path — should return as fast as possible.
      *
-     * @param list<array<string, mixed>> $events
+     * @param list<string> $payloads
      */
-    public function enqueue(array $events): void;
+    public function enqueue(array $payloads): void;
 
     /**
-     * Pop up to $maxItems events as a single batch.
-     * The batch should be marked as "claimed" to prevent duplicate consumption.
-     * Return null when the queue is empty.
+     * Pop up to $limit payloads as a list of QueueMessage.
+     * All returned messages share the same receipt (batch granularity).
+     * Return an empty array when the queue is empty.
+     *
+     * @return list<QueueMessage>
      */
-    public function dequeue(int $maxItems): ?EventBatch;
+    public function dequeue(int $limit): array;
 
     /**
      * Confirm successful delivery — remove the claimed batch.
+     * All messages with the same receipt must be acked together.
+     *
+     * @param list<QueueMessage> $messages
      */
-    public function ack(string $batchId): void;
+    public function ack(array $messages): void;
 
     /**
      * Delivery failed — return the batch to the queue for retry.
+     * All messages with the same receipt must be nacked together.
+     *
+     * @param list<QueueMessage> $messages
      */
-    public function nack(string $batchId): void;
+    public function nack(array $messages): void;
 }
 ```
 
 **Implementation notes:**
 
 - `enqueue()` runs inside PHP-FPM request handling — avoid expensive I/O (network round-trips, synchronous disk flushes, etc.)
-- `dequeue()` returns an `EventBatch` containing a `batchId` (unique identifier) and an `events` array
-- Claimed batches should have an expiration mechanism (e.g. TTL in Redis, scheduled cleanup in a database) so they are automatically recovered if a worker crashes
-- `ack()` / `nack()` will be called at most once for each `batchId`
+- `dequeue()` returns a `list<QueueMessage>` (empty array when the queue is empty). Each `QueueMessage` carries a `receipt` (shared by all messages from the same `dequeue` call) and a `payload` (raw JSON string)
+- ack/nack granularity is **receipt-level** — all messages from the same `dequeue` call share one receipt and must be acked or nacked as a whole; partial confirmation within a receipt is not supported
+- Claimed receipts should have an expiration mechanism (e.g. TTL in Redis, scheduled cleanup in a database) so they are automatically recovered if a worker crashes
 
 ### Wiring Custom Adapters
 

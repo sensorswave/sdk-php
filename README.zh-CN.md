@@ -558,43 +558,51 @@ flowchart LR
 
 ```php
 use SensorsWave\Contract\EventQueueInterface;
-use SensorsWave\Storage\EventBatch;
+use SensorsWave\Storage\QueueMessage;
 
 interface EventQueueInterface
 {
     /**
-     * 将事件数组写入队列。
+     * 将原始 JSON payload 写入队列。
      * 在请求路径上调用 — 应尽快返回。
      *
-     * @param list<array<string, mixed>> $events
+     * @param list<string> $payloads
      */
-    public function enqueue(array $events): void;
+    public function enqueue(array $payloads): void;
 
     /**
-     * 弹出最多 $maxItems 个事件作为一个批次。
-     * 批次应标记为"已认领"以防止重复消费。
-     * 队列为空时返回 null。
+     * 弹出最多 $limit 个 payload，以 QueueMessage 列表返回。
+     * 同一次调用返回的所有消息共享同一个 receipt（批次粒度）。
+     * 队列为空时返回空数组。
+     *
+     * @return list<QueueMessage>
      */
-    public function dequeue(int $maxItems): ?EventBatch;
+    public function dequeue(int $limit): array;
 
     /**
      * 确认投递成功 — 移除已认领的批次。
+     * 同一 receipt 下的消息必须整批确认。
+     *
+     * @param list<QueueMessage> $messages
      */
-    public function ack(string $batchId): void;
+    public function ack(array $messages): void;
 
     /**
      * 投递失败 — 将批次退回队列以便重试。
+     * 同一 receipt 下的消息必须整批退回。
+     *
+     * @param list<QueueMessage> $messages
      */
-    public function nack(string $batchId): void;
+    public function nack(array $messages): void;
 }
 ```
 
 **实现注意事项：**
 
 - `enqueue()` 在 PHP-FPM 请求处理中运行 — 避免昂贵的 I/O（网络往返、同步磁盘刷写等）
-- `dequeue()` 返回包含 `batchId`（唯一标识）和 `events` 数组的 `EventBatch`
-- 已认领的批次应有过期机制（如 Redis 中的 TTL、数据库中的定时清理），以便 Worker 崩溃时自动恢复
-- `ack()` / `nack()` 对每个 `batchId` 最多调用一次
+- `dequeue()` 返回 `list<QueueMessage>`（队列为空时返回空数组）。每个 `QueueMessage` 包含 `receipt`（同一次 `dequeue` 调用的所有消息共享同一个 receipt）和 `payload`（原始 JSON 字符串）
+- ack/nack 的粒度是 **receipt 级别** — 同一次 `dequeue` 调用返回的所有消息共享一个 receipt，必须整批 ack 或整批 nack，不支持对同一 receipt 下的消息做部分确认
+- 已认领的 receipt 应有过期机制（如 Redis 中的 TTL、数据库中的定时清理），以便 Worker 崩溃时自动恢复
 
 ### 接入自定义适配器
 
