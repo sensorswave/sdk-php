@@ -29,6 +29,51 @@ The PHP SDK separates request-path logic from network I/O, making it safe for PH
 
 By default, the SDK uses local file adapters under `sys_get_temp_dir()`. You can replace them with Redis-backed adapters by implementing the `RedisClientInterface`.
 
+```mermaid
+flowchart LR
+    subgraph request["👤 Request Path"]
+        Client([Client])
+    end
+
+    subgraph sync["⏰ sensorswave-sync · Cron"]
+        SyncCmd([SyncCommand])
+    end
+
+    subgraph send["⏰ sensorswave-send · Cron"]
+        SendCmd([SendCommand])
+    end
+
+    ABStore[(💾 ABSpecStore)]
+    Queue[(📨 EventQueue)]
+    Meta["🌐 Meta Endpoint<br>POST /ab/all4eval"]
+    Collector["🌐 Collector Endpoint<br>POST /in/track"]
+
+    SyncCmd -- "fetch specs" --> Meta
+    Meta -. "response" .-> SyncCmd
+    SyncCmd -- "save()" --> ABStore
+
+    ABStore -- "load()" --> Client
+    Client -- "enqueue()" --> Queue
+
+    Queue -- "dequeue()" --> SendCmd
+    SendCmd -- "deliver" --> Collector
+    Collector -. "ack / nack" .-> SendCmd
+
+    classDef green fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
+    classDef blue fill:#cce5ff,stroke:#004085,stroke-width:2px,color:#004085
+    classDef purple fill:#e2d9f3,stroke:#6f42c1,stroke-width:2px,color:#4a2d8a
+    classDef orange fill:#fff3cd,stroke:#d68a00,stroke-width:2px,color:#856404
+
+    class Client green
+    class SyncCmd,SendCmd blue
+    class ABStore,Queue purple
+    class Meta,Collector orange
+
+    style request fill:none,stroke:#28a745,stroke-width:2px,stroke-dasharray:5 5
+    style sync fill:none,stroke:#004085,stroke-width:2px,stroke-dasharray:5 5
+    style send fill:none,stroke:#004085,stroke-width:2px,stroke-dasharray:5 5
+```
+
 ---
 
 ## Quick Start
