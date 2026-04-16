@@ -1,5 +1,7 @@
 # SensorsWave PHP SDK
 
+**English** | [中文](README.zh-CN.md)
+
 A lightweight PHP SDK for event tracking and A/B testing, designed for PHP/FPM environments.
 
 ## Features
