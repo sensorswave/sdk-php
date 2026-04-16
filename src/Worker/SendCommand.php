@@ -9,6 +9,7 @@ use SensorsWave\Http\HttpClient;
 use SensorsWave\Http\Request;
 use SensorsWave\Http\Response;
 use SensorsWave\Http\TransportInterface;
+use SensorsWave\Storage\QueueMessage;
 
 /**
  * 事件发送任务。
@@ -26,26 +27,19 @@ final class SendCommand
         $this->transport = $transport ?? $config->transport ?? new HttpClient($config->httpTimeoutMs);
     }
 
-    public function run(int $maxItems = 50): int
+    public function run(int $limit = 50): int
     {
         $status = 0;
         while (true) {
-            $batch = $this->config->eventQueue->dequeue($maxItems);
-            if ($batch === null) {
+            $messages = $this->config->eventQueue->dequeue($limit);
+            if ($messages === []) {
                 return $status;
             }
 
-            try {
-                $body = json_encode($batch->events, JSON_THROW_ON_ERROR);
-            } catch (\JsonException $exception) {
-                $this->config->logger->error(
-                    'failed to encode event batch, discarding',
-                    ['batch_id' => $batch->batchId, 'error' => $exception->getMessage()]
-                );
-                $this->config->eventQueue->ack($batch->batchId);
-                $status = 1;
-                continue;
-            }
+            $body = '[' . implode(',', array_map(
+                fn(QueueMessage $m) => $m->payload,
+                $messages
+            )) . ']';
 
             $request = new Request(
                 'POST',
@@ -58,11 +52,11 @@ final class SendCommand
             );
 
             if ($this->deliver($request)) {
-                $this->config->eventQueue->ack($batch->batchId);
+                $this->config->eventQueue->ack($messages);
                 continue;
             }
 
-            $this->config->eventQueue->nack($batch->batchId);
+            $this->config->eventQueue->nack($messages);
             $status = 1;
             return $status;
         }

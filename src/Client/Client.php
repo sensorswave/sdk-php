@@ -428,20 +428,19 @@ final class Client
             return;
         }
 
-        $body = '[' . implode(',', $this->pendingMessages) . ']';
+        $payloads = $this->pendingMessages;
         $this->pendingMessages = [];
         $this->pendingBodySize = 0;
         $this->lastTrackFlushAtMs = $this->nowMs();
 
         try {
-            /** @var list<array<string, mixed>> $events */
-            $events = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
-            $this->config->eventQueue->enqueue($events);
+            $this->config->eventQueue->enqueue($payloads);
         } catch (\Throwable $throwable) {
             $this->config->logger->error(
                 'event queue enqueue failed',
                 ['error' => $throwable->getMessage()]
             );
+            $body = '[' . implode(',', $payloads) . ']';
             $this->notifyTrackFailure($body, $throwable, null);
         }
     }
