@@ -4,21 +4,22 @@ declare(strict_types=1);
 
 namespace SensorsWave\Contract;
 
-use SensorsWave\Storage\EventBatch;
+use SensorsWave\Storage\QueueMessage;
 
 /**
- * 待发送事件队列抽象。
+ * 事件队列抽象。
  */
 interface EventQueueInterface
 {
-    /**
-     * @param list<array<string, mixed>> $events
-     */
-    public function enqueue(array $events): void;
+    /** @param list<string> $payloads */
+    public function enqueue(array $payloads): void;
 
-    public function dequeue(int $maxItems): ?EventBatch;
+    /** @return list<QueueMessage> */
+    public function dequeue(int $limit): array;
 
-    public function ack(string $batchId): void;
+    /** @param list<QueueMessage> $messages */
+    public function ack(array $messages): void;
 
-    public function nack(string $batchId): void;
+    /** @param list<QueueMessage> $messages */
+    public function nack(array $messages): void;
 }
