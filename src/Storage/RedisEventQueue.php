@@ -9,19 +9,20 @@ use RuntimeException;
 use SensorsWave\Contract\EventQueueInterface;
 use SensorsWave\Contract\RedisClientInterface;
 
+/**
+ * 基于 Redis 的事件队列。
+ */
 final class RedisEventQueue implements EventQueueInterface
 {
     /**
-     * 默认 claim TTL：1 小时。如果 worker 崩溃，claim 过期后自动清理，
-     * 避免永久残留。
+     * 默认 claim TTL：1 小时。
      */
     private const DEFAULT_CLAIM_TTL_SECONDS = 3600;
 
     /**
-     * Lua: 原子批量 dequeue。
+     * Lua: 原子 dequeue。
      * KEYS[1] = queueKey, KEYS[2] = claimKey
-     * ARGV[1] = maxBatches（一次最多取几个 batch）, ARGV[2] = claimTtlSeconds
-     * 返回 JSON 编码的 batch payload 数组字符串，或 false（队列为空）。
+     * ARGV[1] = limit, ARGV[2] = claimTtlSeconds
      */
     private const LUA_DEQUEUE = <<<'LUA'
         local items = redis.call('LRANGE', KEYS[1], 0, ARGV[1] - 1)
@@ -35,9 +36,8 @@ final class RedisEventQueue implements EventQueueInterface
         LUA;
 
     /**
-     * Lua: 原子 nack，将 batch payloads 逐条推回队列头部（保持原顺序）。
+     * Lua: 原子 nack，将 payloads 逐条推回队列头部（保持原顺序）。
      * KEYS[1] = claimKey, KEYS[2] = queueKey
-     * 返回 1（成功）或 0（claim 已过期）。
      */
     private const LUA_NACK = <<<'LUA'
         local payload = redis.call('GET', KEYS[1])
@@ -52,102 +52,75 @@ final class RedisEventQueue implements EventQueueInterface
         return 1
         LUA;
 
-    /**
-     * 一次 dequeue 最多取几个 batch 合并。
-     */
-    private const DEFAULT_MAX_BATCHES = 10;
-
     public function __construct(
         private readonly RedisClientInterface $redis,
         private readonly string $queueKey = '{sensorswave}:event_queue',
         private readonly string $claimPrefix = '{sensorswave}:event_claim:',
         private readonly int $claimTtlSeconds = self::DEFAULT_CLAIM_TTL_SECONDS,
-        private readonly int $maxBatches = self::DEFAULT_MAX_BATCHES,
     ) {
     }
 
-    /**
-     * 将 events 打包成一个 batch（含 batch_id 信封）后 RPUSH 进队列。
-     */
-    public function enqueue(array $events): void
+    public function enqueue(array $payloads): void
     {
-        try {
-            $payload = json_encode([
-                'batch_id' => uniqid('batch-', true),
-                'events'   => $events,
-            ], JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new RuntimeException('failed to encode Redis event batch', 0, $exception);
+        if ($payloads === []) {
+            return;
         }
-
-        $this->redis->rPush($this->queueKey, $payload);
+        $this->redis->rPush($this->queueKey, ...$payloads);
     }
 
-    /**
-     * 原子批量取出最多 $maxBatches 个 batch，解包后合并 events，
-     * 截取前 $maxItems 条返回。
-     */
-    public function dequeue(int $maxItems): ?EventBatch
+    public function dequeue(int $limit): array
     {
-        $batchId  = uniqid('batch-', true);
-        $claimKey = $this->claimPrefix . $batchId;
+        $receipt  = uniqid('rcpt-', true);
+        $claimKey = $this->claimPrefix . $receipt;
 
         /** @var string|false $payload */
         $payload = $this->redis->eval(
             self::LUA_DEQUEUE,
             [$this->queueKey, $claimKey],
-            [$this->maxBatches, $this->claimTtlSeconds],
+            [$limit, $this->claimTtlSeconds],
         );
 
         if (!is_string($payload) || $payload === '') {
-            return null;
+            return [];
         }
 
         try {
-            /** @var list<string> $rawBatches */
-            $rawBatches = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+            /** @var list<string> $items */
+            $items = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new RuntimeException('failed to decode claim payload', 0, $exception);
         }
 
-        $events = [];
-        foreach ($rawBatches as $raw) {
-            try {
-                /** @var array{batch_id?: mixed, events?: mixed} $decoded */
-                $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
-                if (is_array($decoded['events'] ?? null)) {
-                    foreach ($decoded['events'] as $event) {
-                        $events[] = $event;
-                        if (count($events) >= $maxItems) {
-                            break 2;
-                        }
-                    }
-                }
-            } catch (JsonException) {
-                // 跳过损坏的 batch
-            }
+        $messages = [];
+        foreach ($items as $item) {
+            $messages[] = new QueueMessage($receipt, $item);
         }
 
-        if ($events === []) {
-            $this->redis->del($claimKey);
-            return null;
+        return $messages;
+    }
+
+    public function ack(array $messages): void
+    {
+        $receipts = array_unique(array_map(
+            fn(QueueMessage $m) => $m->receipt,
+            $messages,
+        ));
+        foreach ($receipts as $receipt) {
+            $this->redis->del($this->claimPrefix . $receipt);
         }
-
-        return new EventBatch($batchId, $events);
     }
 
-    public function ack(string $batchId): void
+    public function nack(array $messages): void
     {
-        $this->redis->del($this->claimPrefix . $batchId);
-    }
-
-    public function nack(string $batchId): void
-    {
-        $claimKey = $this->claimPrefix . $batchId;
-
-        $this->redis->eval(
-            self::LUA_NACK,
-            [$claimKey, $this->queueKey],
-        );
+        $receipts = array_unique(array_map(
+            fn(QueueMessage $m) => $m->receipt,
+            $messages,
+        ));
+        foreach ($receipts as $receipt) {
+            $this->redis->eval(
+                self::LUA_NACK,
+                [$this->claimPrefix . $receipt, $this->queueKey],
+            );
+        }
     }
 }
