@@ -86,7 +86,7 @@ final class MemoryRedisClient implements RedisClientInterface
             return [];
         }
         $stop = $stop < 0 ? $len + $stop : $stop;
-        return array_values(array_slice($list, $start, $stop - $start + 1));
+        return array_slice($list, $start, $stop - $start + 1);
     }
 
     public function lTrim(string $key, int $start, int $stop): bool
@@ -97,7 +97,7 @@ final class MemoryRedisClient implements RedisClientInterface
             return true;
         }
         $stop = $stop < 0 ? $len + $stop : $stop;
-        $this->lists[$key] = array_values(array_slice($list, $start, $stop - $start + 1));
+        $this->lists[$key] = array_slice($list, $start, $stop - $start + 1);
         return true;
     }
 
