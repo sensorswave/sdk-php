@@ -33,86 +33,91 @@ final class LocalFileEventQueue implements EventQueueInterface
         $this->lockPath = $resolvedQueuePath . '.lock';
     }
 
-    public function enqueue(array $events): void
+    public function enqueue(array $payloads): void
     {
-        $this->withLock(function () use ($events): void {
+        $this->withLock(function () use ($payloads): void {
             $queue = $this->readQueue();
-            $queue[] = [
-                'batch_id' => uniqid('batch-', true),
-                'events' => $events,
-            ];
+            array_push($queue, ...$payloads);
             $this->writeQueue($queue);
         });
     }
 
-    public function dequeue(int $maxItems): ?EventBatch
+    public function dequeue(int $limit): array
     {
-        return $this->withLock(function () use ($maxItems): ?EventBatch {
+        return $this->withLock(function () use ($limit): array {
             $queue = $this->readQueue();
             if ($queue === []) {
-                return null;
+                return [];
             }
 
-            /** @var array{batch_id?: mixed, events?: mixed} $payload */
-            $payload = array_shift($queue);
+            $taken = array_splice($queue, 0, max(1, $limit));
             $this->writeQueue($queue);
 
-            $batchId = is_string($payload['batch_id'] ?? null)
-                ? $payload['batch_id']
-                : uniqid('batch-', true);
-            /** @var list<array<string, mixed>> $events */
-            $events = is_array($payload['events'] ?? null)
-                ? array_slice($payload['events'], 0, max(1, $maxItems))
-                : [];
+            $receipt = uniqid('rcpt-', true);
+            $this->writeClaim($receipt, $taken);
 
-            $this->writeClaim($batchId, $events);
+            $messages = [];
+            foreach ($taken as $payload) {
+                $messages[] = new QueueMessage($receipt, $payload);
+            }
 
-            return new EventBatch($batchId, $events);
+            return $messages;
         });
     }
 
-    public function ack(string $batchId): void
+    public function ack(array $messages): void
     {
-        $this->withLock(function () use ($batchId): void {
-            $claimPath = $this->claimPath($batchId);
-            if (is_file($claimPath)) {
-                @unlink($claimPath);
+        $this->withLock(function () use ($messages): void {
+            $receipts = array_unique(array_map(
+                fn(QueueMessage $m) => $m->receipt,
+                $messages,
+            ));
+            foreach ($receipts as $receipt) {
+                $claimPath = $this->claimPath($receipt);
+                if (is_file($claimPath)) {
+                    @unlink($claimPath);
+                }
             }
         });
     }
 
-    public function nack(string $batchId): void
+    public function nack(array $messages): void
     {
-        $this->withLock(function () use ($batchId): void {
-            $claimPath = $this->claimPath($batchId);
-            if (!is_file($claimPath)) {
-                return;
-            }
-
-            $contents = file_get_contents($claimPath);
-            if ($contents === false || $contents === '') {
-                @unlink($claimPath);
-                return;
-            }
-
-            try {
-                /** @var array{batch_id?: mixed, events?: mixed} $payload */
-                $payload = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
-            } catch (JsonException) {
-                @unlink($claimPath);
-                return;
-            }
+        $this->withLock(function () use ($messages): void {
+            $receipts = array_unique(array_map(
+                fn(QueueMessage $m) => $m->receipt,
+                $messages,
+            ));
 
             $queue = $this->readQueue();
-            array_unshift($queue, $payload);
+            foreach ($receipts as $receipt) {
+                $claimPath = $this->claimPath($receipt);
+                if (!is_file($claimPath)) {
+                    continue;
+                }
+
+                $contents = file_get_contents($claimPath);
+                if ($contents === false || $contents === '') {
+                    @unlink($claimPath);
+                    continue;
+                }
+
+                try {
+                    /** @var list<string> $payloads */
+                    $payloads = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+                } catch (JsonException) {
+                    @unlink($claimPath);
+                    continue;
+                }
+
+                array_unshift($queue, ...$payloads);
+                @unlink($claimPath);
+            }
             $this->writeQueue($queue);
-            @unlink($claimPath);
         });
     }
 
-    /**
-     * @return list<array{batch_id: string, events: list<array<string, mixed>>}>
-     */
+    /** @return list<string> */
     private function readQueue(): array
     {
         if (!is_file($this->queuePath)) {
@@ -125,7 +130,7 @@ final class LocalFileEventQueue implements EventQueueInterface
         }
 
         try {
-            /** @var list<array{batch_id: string, events: list<array<string, mixed>>}> $decoded */
+            /** @var list<string> $decoded */
             $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
             return $decoded;
         } catch (JsonException) {
@@ -133,9 +138,7 @@ final class LocalFileEventQueue implements EventQueueInterface
         }
     }
 
-    /**
-     * @param list<array{batch_id: string, events: list<array<string, mixed>>}> $queue
-     */
+    /** @param list<string> $queue */
     private function writeQueue(array $queue): void
     {
         $directory = dirname($this->queuePath);
@@ -149,37 +152,45 @@ final class LocalFileEventQueue implements EventQueueInterface
             throw new RuntimeException('failed to encode event queue payload', 0, $exception);
         }
 
-        if (file_put_contents($this->queuePath, $json) === false) {
+        $tempPath = $this->queuePath . '.' . uniqid('tmp', true);
+        if (file_put_contents($tempPath, $json) === false) {
             throw new RuntimeException('failed to write event queue');
+        }
+
+        if (!rename($tempPath, $this->queuePath)) {
+            @unlink($tempPath);
+            throw new RuntimeException('failed to move event queue into place');
         }
     }
 
-    /**
-     * @param list<array<string, mixed>> $events
-     */
-    private function writeClaim(string $batchId, array $events): void
+    /** @param list<string> $payloads */
+    private function writeClaim(string $receipt, array $payloads): void
     {
         if (!is_dir($this->claimDirectory) && !mkdir($this->claimDirectory, 0777, true) && !is_dir($this->claimDirectory)) {
             throw new RuntimeException('failed to create event claim directory');
         }
 
         try {
-            $json = json_encode([
-                'batch_id' => $batchId,
-                'events' => $events,
-            ], JSON_THROW_ON_ERROR);
+            $json = json_encode($payloads, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new RuntimeException('failed to encode event claim', 0, $exception);
         }
 
-        if (file_put_contents($this->claimPath($batchId), $json) === false) {
+        $claimPath = $this->claimPath($receipt);
+        $tempPath = $claimPath . '.' . uniqid('tmp', true);
+        if (file_put_contents($tempPath, $json) === false) {
             throw new RuntimeException('failed to write event claim');
+        }
+
+        if (!rename($tempPath, $claimPath)) {
+            @unlink($tempPath);
+            throw new RuntimeException('failed to move event claim into place');
         }
     }
 
-    private function claimPath(string $batchId): string
+    private function claimPath(string $receipt): string
     {
-        return $this->claimDirectory . '/' . str_replace(['/', '\\'], '-', $batchId) . '.json';
+        return $this->claimDirectory . '/' . str_replace(['/', '\\'], '-', $receipt) . '.json';
     }
 
     /**
