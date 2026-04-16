@@ -1,6 +1,25 @@
 #!/usr/bin/env php
 <?php
 
+/**
+ * sensorswave-sync — A/B 规则同步定时任务
+ *
+ * 从远程元数据端点拉取 A/B 测试规则，保存快照到本地 ABSpecStore。
+ * 建议通过 cron 定时执行，例如每分钟一次：
+ *   * * * * * /path/to/sensorswave-sync https://your-endpoint.com your-source-token your-project-secret
+ *
+ * 下方使用默认 ABConfig（本地文件存储）。
+ * 生产环境请根据实际需求自定义，例如：
+ *
+ *   $abConfig = new ABConfig(
+ *       projectSecret:      'your-project-secret',
+ *       abSpecStore:        new RedisABSpecStore($redis),  // Redis 存储替代本地文件
+ *       metaEndpoint:       'https://custom-meta.com',     // 自定义元数据端点（默认复用 endpoint）
+ *       metaUriPath:        '/ab/all4eval',                // 元数据 URI 路径
+ *       metaLoadIntervalMs: 30_000,                        // 拉取间隔（毫秒）
+ *   );
+ */
+
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
