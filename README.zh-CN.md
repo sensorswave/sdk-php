@@ -572,7 +572,6 @@ interface EventQueueInterface
 
     /**
      * 弹出最多 $limit 个 payload，以 QueueMessage 列表返回。
-     * 同一次调用返回的所有消息共享同一个 receipt（批次粒度）。
      * 队列为空时返回空数组。
      *
      * @return list<QueueMessage>
@@ -580,16 +579,14 @@ interface EventQueueInterface
     public function dequeue(int $limit): array;
 
     /**
-     * 确认投递成功 — 移除已认领的批次。
-     * 同一 receipt 下的消息必须整批确认。
+     * 确认投递成功 — 移除指定消息。
      *
      * @param list<QueueMessage> $messages
      */
     public function ack(array $messages): void;
 
     /**
-     * 投递失败 — 将批次退回队列以便重试。
-     * 同一 receipt 下的消息必须整批退回。
+     * 投递失败 — 将消息退回队列以便重试。
      *
      * @param list<QueueMessage> $messages
      */
@@ -600,9 +597,9 @@ interface EventQueueInterface
 **实现注意事项：**
 
 - `enqueue()` 在 PHP-FPM 请求处理中运行 — 避免昂贵的 I/O（网络往返、同步磁盘刷写等）
-- `dequeue()` 返回 `list<QueueMessage>`（队列为空时返回空数组）。每个 `QueueMessage` 包含 `receipt`（同一次 `dequeue` 调用的所有消息共享同一个 receipt）和 `payload`（原始 JSON 字符串）
-- ack/nack 的粒度是 **receipt 级别** — 同一次 `dequeue` 调用返回的所有消息共享一个 receipt，必须整批 ack 或整批 nack，不支持对同一 receipt 下的消息做部分确认
-- 已认领的 receipt 应有过期机制（如 Redis 中的 TTL、数据库中的定时清理），以便 Worker 崩溃时自动恢复
+- `dequeue()` 返回 `list<QueueMessage>`（队列为空时返回空数组）。每个 `QueueMessage` 包含 `receipt`（由实现定义的不透明确认令牌）和 `payload`（原始 JSON 字符串）
+- `receipt` 的粒度由具体实现决定。内置的 `LocalFileEventQueue` 和 `RedisEventQueue` 为每次 `dequeue` 调用分配一个共享 receipt，该批次必须整体 ack 或 nack；其他实现（如 Kafka）可以为每条消息分配独立 receipt（如分区 offset），从而支持更细粒度的确认
+- 已认领的消息应有过期机制（如 Redis 中的 TTL、数据库中的定时清理），以便 Worker 崩溃时自动恢复
 
 ### 接入自定义适配器
 

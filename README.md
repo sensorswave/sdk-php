@@ -572,7 +572,6 @@ interface EventQueueInterface
 
     /**
      * Pop up to $limit payloads as a list of QueueMessage.
-     * All returned messages share the same receipt (batch granularity).
      * Return an empty array when the queue is empty.
      *
      * @return list<QueueMessage>
@@ -580,16 +579,14 @@ interface EventQueueInterface
     public function dequeue(int $limit): array;
 
     /**
-     * Confirm successful delivery — remove the claimed batch.
-     * All messages with the same receipt must be acked together.
+     * Confirm successful delivery of the given messages.
      *
      * @param list<QueueMessage> $messages
      */
     public function ack(array $messages): void;
 
     /**
-     * Delivery failed — return the batch to the queue for retry.
-     * All messages with the same receipt must be nacked together.
+     * Delivery failed — return the messages to the queue for retry.
      *
      * @param list<QueueMessage> $messages
      */
@@ -600,9 +597,9 @@ interface EventQueueInterface
 **Implementation notes:**
 
 - `enqueue()` runs inside PHP-FPM request handling — avoid expensive I/O (network round-trips, synchronous disk flushes, etc.)
-- `dequeue()` returns a `list<QueueMessage>` (empty array when the queue is empty). Each `QueueMessage` carries a `receipt` (shared by all messages from the same `dequeue` call) and a `payload` (raw JSON string)
-- ack/nack granularity is **receipt-level** — all messages from the same `dequeue` call share one receipt and must be acked or nacked as a whole; partial confirmation within a receipt is not supported
-- Claimed receipts should have an expiration mechanism (e.g. TTL in Redis, scheduled cleanup in a database) so they are automatically recovered if a worker crashes
+- `dequeue()` returns a `list<QueueMessage>` (empty array when the queue is empty). Each `QueueMessage` carries an opaque `receipt` (an implementation-defined acknowledgment token) and a `payload` (raw JSON string)
+- The `receipt` granularity is implementation-defined. The built-in `LocalFileEventQueue` and `RedisEventQueue` assign one shared receipt per `dequeue` call, so all messages in that batch must be acked or nacked together. Other implementations (e.g. Kafka) may assign a per-message receipt (e.g. partition offset), allowing finer-grained acknowledgment
+- Claimed messages should have an expiration mechanism (e.g. TTL in Redis, scheduled cleanup in a database) so they are automatically recovered if a worker crashes
 
 ### Wiring Custom Adapters
 
