@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SensorsWave\Storage;
 
-use JsonException;
 use RuntimeException;
 use SensorsWave\Contract\ABSpecStoreInterface;
 use SensorsWave\Contract\RedisClientInterface;
@@ -32,15 +31,5 @@ final class RedisABSpecStore implements ABSpecStoreInterface
         if (!$this->redis->set($this->key, $snapshot)) {
             throw new RuntimeException('failed to save Redis AB snapshot');
         }
-    }
-
-    public function metadata(): ABSpecStoreMetadata
-    {
-        $payload = $this->redis->get($this->key);
-        if (!is_string($payload) || $payload === '') {
-            return new ABSpecStoreMetadata(null);
-        }
-
-        return new ABSpecStoreMetadata(0);
     }
 }

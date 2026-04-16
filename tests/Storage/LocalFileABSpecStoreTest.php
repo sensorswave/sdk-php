@@ -26,10 +26,9 @@ final class LocalFileABSpecStoreTest extends TestCase
         $store = new LocalFileABSpecStore($this->storePath);
 
         self::assertNull($store->load());
-        self::assertNull($store->metadata()->updatedAtMs);
     }
 
-    public function testStorePersistsSnapshotAndMetadata(): void
+    public function testStorePersistsSnapshot(): void
     {
         $store = new LocalFileABSpecStore($this->storePath);
         $snapshot = '{"code":0,"data":{"update":true,"update_time":1,"ab_specs":[]}}';
@@ -37,6 +36,5 @@ final class LocalFileABSpecStoreTest extends TestCase
         $store->save($snapshot);
 
         self::assertSame($snapshot, $store->load());
-        self::assertNotNull($store->metadata()->updatedAtMs);
     }
 }

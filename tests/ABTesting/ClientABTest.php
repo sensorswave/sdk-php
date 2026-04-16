@@ -72,7 +72,7 @@ final class ClientABTest extends TestCase
     public function testClientEvaluatesFromLocalStoreWithoutRemoteRequests(): void
     {
         $snapshot = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
-        $store = new MemoryABSpecStore($snapshot, (int) floor(microtime(true) * 1000));
+        $store = new MemoryABSpecStore($snapshot);
         $transport = new FakeTransport();
         $client = Client::create(
             'https://collector.example.com',
@@ -112,8 +112,7 @@ final class ClientABTest extends TestCase
     public function testClientUsesSnapshotRegardlessOfAge(): void
     {
         $snapshot = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
-        // snapshot 即使是 61 秒前写入的也应正常使用，不做过期判定
-        $store = new MemoryABSpecStore($snapshot, ((int) floor(microtime(true) * 1000)) - 61_000);
+        $store = new MemoryABSpecStore($snapshot);
         $client = Client::create(
             'https://collector.example.com',
             'test-token',
@@ -131,7 +130,7 @@ final class ClientABTest extends TestCase
     public function testClientCanExportABSpecsSnapshotFromStore(): void
     {
         $snapshot = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
-        $store = new MemoryABSpecStore($snapshot, (int) floor(microtime(true) * 1000));
+        $store = new MemoryABSpecStore($snapshot);
         $client = Client::create(
             'https://collector.example.com',
             'test-token',

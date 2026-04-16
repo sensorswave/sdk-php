@@ -35,7 +35,6 @@ final class Client
 
     private bool $closed = false;
     private ?ABCore $abCore = null;
-    private ?int $lastMetaLoadAtMs = null;
     private readonly ?\SensorsWave\Contract\StickyHandlerInterface $stickyHandler;
     /** @var list<string> */
     private array $pendingMessages = [];
@@ -515,6 +514,8 @@ final class Client
 
     /**
      * 刷新 A/B core。
+     *
+     * PHP-FPM 模型：每个请求首次调用时从存储加载，后续直接使用内存中的实例。
      */
     private function refreshABCore(bool $forceInitialize): ?ABCore
     {
@@ -523,33 +524,17 @@ final class Client
                 return $this->abCore;
             }
 
-            $metadata = $this->config->ab->abSpecStore->metadata();
-            if ($metadata->updatedAtMs === null) {
-                if ($this->abCore !== null) {
-                    return $this->abCore;
-                }
-                return null;
-            }
-
-            if ($this->abCore !== null && $this->lastMetaLoadAtMs === $metadata->updatedAtMs) {
+            if ($this->abCore !== null) {
                 return $this->abCore;
             }
 
             $snapshot = $this->config->ab->abSpecStore->load();
             if ($snapshot === null || $snapshot === '') {
-                $this->abCore = null;
                 return null;
             }
 
             $storage = StorageFactory::fromJson($snapshot);
-            $this->lastMetaLoadAtMs = $metadata->updatedAtMs;
-
-            if ($this->abCore === null) {
-                $this->abCore = new ABCore($storage, $this->stickyHandler);
-                return $this->abCore;
-            }
-
-            $this->abCore->replaceStorage($storage);
+            $this->abCore = new ABCore($storage, $this->stickyHandler);
             return $this->abCore;
         } catch (\Throwable) {
             $this->config->logger->error(

@@ -55,7 +55,7 @@ final class SyncCommandTest extends TestCase
     public function testSyncCommandKeepsExistingSnapshotWhenRemoteRequestFails(): void
     {
         $existing = '{"code":0,"data":{"update":true,"update_time":1,"ab_specs":[]}}';
-        $store = new MemoryABSpecStore($existing, (int) floor(microtime(true) * 1000));
+        $store = new MemoryABSpecStore($existing);
         $transport = new class implements TransportInterface {
             public function send(Request $request): Response
             {
@@ -88,7 +88,7 @@ final class SyncCommandTest extends TestCase
     {
         // update false
         $existing = '{"code":0,"data":{"update":true,"update_time":1,"ab_specs":[]}}';
-        $store = new MemoryABSpecStore($existing, (int) floor(microtime(true) * 1000));
+        $store = new MemoryABSpecStore($existing);
         $transport = new class implements TransportInterface {
             public function send(Request $request): Response
             {

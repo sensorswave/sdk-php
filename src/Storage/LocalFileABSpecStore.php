@@ -61,18 +61,6 @@ final class LocalFileABSpecStore implements ABSpecStoreInterface
         });
     }
 
-    public function metadata(): ABSpecStoreMetadata
-    {
-        return $this->withLock(function (): ABSpecStoreMetadata {
-            if (!is_file($this->path)) {
-                return new ABSpecStoreMetadata(null);
-            }
-
-            $mtime = filemtime($this->path);
-            return new ABSpecStoreMetadata($mtime === false ? null : $mtime * 1000);
-        });
-    }
-
     /**
      * @template T
      *

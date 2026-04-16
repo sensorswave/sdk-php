@@ -457,11 +457,10 @@ If the built-in file/Redis adapters don't fit your infrastructure, you can imple
 
 ### ABSpecStoreInterface
 
-Manages persistent storage for A/B snapshots. The sync worker calls `save()` to write, and the request-path client calls `load()` / `metadata()` to read.
+Manages persistent storage for A/B snapshots. The sync worker calls `save()` to write, and the request-path client calls `load()` to read.
 
 ```php
 use SensorsWave\Contract\ABSpecStoreInterface;
-use SensorsWave\Storage\ABSpecStoreMetadata;
 
 interface ABSpecStoreInterface
 {
@@ -475,19 +474,12 @@ interface ABSpecStoreInterface
      * Persist the snapshot JSON string (called by the sync worker, never on the request path).
      */
     public function save(string $snapshot): void;
-
-    /**
-     * Return snapshot metadata. updatedAtMs is the millisecond timestamp of the last save;
-     * the SDK uses it to determine data freshness. Pass null when no data is available.
-     */
-    public function metadata(): ABSpecStoreMetadata;
 }
 ```
 
 **Implementation notes:**
 
 - `load()` must return the exact string that was passed to `save()` — do not re-encode or transform it
-- `updatedAtMs` in `metadata()` should be a millisecond timestamp captured at `save()` time — e.g. `(int)(microtime(true) * 1000)`
 - The implementation must be process-safe — request-path FPM processes and the sync worker may read/write concurrently
 
 ### EventQueueInterface
