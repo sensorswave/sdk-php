@@ -318,21 +318,6 @@ final class Client
      */
     private function buildABCore(Config $config): ?ABCore
     {
-        if ($config->ab === null) {
-            return null;
-        }
-
-        if ($config->ab->loadABSpecs !== '') {
-            try {
-                $config->ab->abSpecStore->save($config->ab->loadABSpecs);
-            } catch (\Throwable $throwable) {
-                $config->logger->error(
-                    'ab snapshot bootstrap save failed',
-                    ['error' => $throwable->getMessage()]
-                );
-            }
-        }
-
         return $this->refreshABCore(true);
     }
 
@@ -515,7 +500,8 @@ final class Client
     /**
      * 刷新 A/B core。
      *
-     * PHP-FPM 模型：每个请求首次调用时从存储加载，后续直接使用内存中的实例。
+     * PHP-FPM 模型：每个请求首次调用时加载，后续直接使用内存中的实例。
+     * 优先使用 loadABSpecs（如果配置了），否则从 store 加载。
      */
     private function refreshABCore(bool $forceInitialize): ?ABCore
     {
@@ -528,7 +514,10 @@ final class Client
                 return $this->abCore;
             }
 
-            $snapshot = $this->config->ab->abSpecStore->load();
+            $snapshot = $this->config->ab->loadABSpecs !== ''
+                ? $this->config->ab->loadABSpecs
+                : $this->config->ab->abSpecStore->load();
+
             if ($snapshot === null || $snapshot === '') {
                 return null;
             }
