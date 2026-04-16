@@ -5,45 +5,55 @@ declare(strict_types=1);
 namespace SensorsWave\Tests\Support;
 
 use SensorsWave\Contract\EventQueueInterface;
-use SensorsWave\Storage\EventBatch;
+use SensorsWave\Storage\QueueMessage;
 
 final class MemoryEventQueue implements EventQueueInterface
 {
-    /** @var list<EventBatch> */
+    /** @var list<string> */
     public array $queued = [];
-    /** @var array<string, EventBatch> */
+    /** @var list<QueueMessage> */
     public array $claimed = [];
 
-    public function enqueue(array $events): void
+    public function enqueue(array $payloads): void
     {
-        $this->queued[] = new EventBatch(uniqid('batch-', true), $events);
+        array_push($this->queued, ...$payloads);
     }
 
-    public function dequeue(int $maxItems): ?EventBatch
+    public function dequeue(int $limit): array
     {
         if ($this->queued === []) {
-            return null;
+            return [];
         }
 
-        $batch = array_shift($this->queued);
-        $trimmed = new EventBatch($batch->batchId, array_slice($batch->events, 0, max(1, $maxItems)));
-        $this->claimed[$trimmed->batchId] = $trimmed;
-
-        return $trimmed;
-    }
-
-    public function ack(string $batchId): void
-    {
-        unset($this->claimed[$batchId]);
-    }
-
-    public function nack(string $batchId): void
-    {
-        if (!isset($this->claimed[$batchId])) {
-            return;
+        $taken = array_splice($this->queued, 0, max(1, $limit));
+        $messages = [];
+        foreach ($taken as $payload) {
+            $messages[] = new QueueMessage(uniqid('rcpt-', true), $payload);
         }
+        array_push($this->claimed, ...$messages);
 
-        array_unshift($this->queued, $this->claimed[$batchId]);
-        unset($this->claimed[$batchId]);
+        return $messages;
+    }
+
+    public function ack(array $messages): void
+    {
+        $receipts = array_map(fn(QueueMessage $m) => $m->receipt, $messages);
+        $this->claimed = array_values(array_filter(
+            $this->claimed,
+            fn(QueueMessage $m) => !in_array($m->receipt, $receipts, true),
+        ));
+    }
+
+    public function nack(array $messages): void
+    {
+        $receipts = [];
+        foreach ($messages as $message) {
+            $receipts[] = $message->receipt;
+            array_unshift($this->queued, $message->payload);
+        }
+        $this->claimed = array_values(array_filter(
+            $this->claimed,
+            fn(QueueMessage $m) => !in_array($m->receipt, $receipts, true),
+        ));
     }
 }
