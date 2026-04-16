@@ -3,6 +3,7 @@
 /.phpunit.result.cache
 .idea
 .serena
+.claude
 .phpactor.json
 package.xml
 /docs/plans/
