@@ -186,7 +186,7 @@ final class Event implements JsonSerializable
             'trace_id' => $this->traceId,
             'event' => $this->event,
             'properties' => $this->properties->all(),
-            'user_properties' => $this->userProperties->all(),
+            'user_properties' => $this->userProperties->all() ?: (object) [],
         ];
     }
 }
