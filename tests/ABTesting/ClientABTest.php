@@ -33,9 +33,9 @@ final class ClientABTest extends TestCase
         self::assertTrue($client->checkFeatureGate(new User('', 'user-pass'), 'TestSpec'));
         $client->close();
 
-        $batch = $queue->dequeue(50);
-        self::assertNotNull($batch);
-        self::assertSame('$FeatureImpress', $batch->events[0]['event']);
+        $messages = $queue->dequeue(50);
+        self::assertNotSame([], $messages);
+        self::assertSame('$FeatureImpress', json_decode($messages[0]->payload, true)['event']);
     }
 
     public function testClientCanEvaluateAllABResultsAndTrackImpressions(): void
@@ -64,9 +64,9 @@ final class ClientABTest extends TestCase
         self::assertCount(3, $results);
         $client->close();
 
-        $batch = $queue->dequeue(50);
-        self::assertNotNull($batch);
-        self::assertCount(3, $batch->events);
+        $messages = $queue->dequeue(50);
+        self::assertNotSame([], $messages);
+        self::assertCount(3, $messages);
     }
 
     public function testClientEvaluatesFromLocalStoreWithoutRemoteRequests(): void

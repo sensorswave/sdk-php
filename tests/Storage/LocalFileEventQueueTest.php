@@ -36,35 +36,34 @@ final class LocalFileEventQueueTest extends TestCase
         }
     }
 
-    public function testQueueEnqueueDequeueAckLifecycle(): void
+    public function testEnqueueDequeueAckLifecycle(): void
     {
         $queue = new LocalFileEventQueue($this->queuePath, $this->claimDir);
-        $events = [['event' => 'PageView'], ['event' => 'Purchase']];
 
-        $queue->enqueue($events);
+        $queue->enqueue(['{"event":"PageView"}', '{"event":"Purchase"}']);
 
-        $batch = $queue->dequeue(50);
-        self::assertNotNull($batch);
-        self::assertSame($events, $batch->events);
+        $messages = $queue->dequeue(50);
+        self::assertCount(2, $messages);
+        self::assertSame('{"event":"PageView"}', $messages[0]->payload);
+        self::assertSame('{"event":"Purchase"}', $messages[1]->payload);
 
-        $queue->ack($batch->batchId);
-        self::assertNull($queue->dequeue(50));
+        $queue->ack($messages);
+        self::assertSame([], $queue->dequeue(50));
     }
 
-    public function testQueueNackPutsClaimedBatchBackIntoQueue(): void
+    public function testNackPutsMessagesBackIntoQueue(): void
     {
         $queue = new LocalFileEventQueue($this->queuePath, $this->claimDir);
-        $events = [['event' => 'RetryEvent']];
 
-        $queue->enqueue($events);
+        $queue->enqueue(['{"event":"RetryEvent"}']);
 
-        $batch = $queue->dequeue(50);
-        self::assertNotNull($batch);
+        $messages = $queue->dequeue(50);
+        self::assertCount(1, $messages);
 
-        $queue->nack($batch->batchId);
+        $queue->nack($messages);
 
         $retried = $queue->dequeue(50);
-        self::assertNotNull($retried);
-        self::assertSame($events, $retried->events);
+        self::assertCount(1, $retried);
+        self::assertSame('{"event":"RetryEvent"}', $retried[0]->payload);
     }
 }

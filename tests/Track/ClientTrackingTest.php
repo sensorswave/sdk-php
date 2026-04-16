@@ -32,11 +32,12 @@ final class ClientTrackingTest extends TestCase
         $client->close();
 
         self::assertCount(0, $transport->requests);
-        $batch = $queue->dequeue(50);
-        self::assertNotNull($batch);
-        self::assertSame('$Identify', $batch->events[0]['event']);
-        self::assertSame('anon-123', $batch->events[0]['anon_id']);
-        self::assertSame('user-456', $batch->events[0]['login_id']);
+        $messages = $queue->dequeue(50);
+        self::assertNotSame([], $messages);
+        $event = json_decode($messages[0]->payload, true);
+        self::assertSame('$Identify', $event['event']);
+        self::assertSame('anon-123', $event['anon_id']);
+        self::assertSame('user-456', $event['login_id']);
     }
 
     public function testIdentifyRequiresBothIds(): void
@@ -67,13 +68,15 @@ final class ClientTrackingTest extends TestCase
         $client->profileIncrement($user, ['coins' => 3, 'plan' => 'pro']);
         $client->close();
 
-        $batch = $queue->dequeue(50);
-        self::assertNotNull($batch);
-        self::assertCount(3, $batch->events);
-        self::assertSame('ArrayEvent', $batch->events[0]['event']);
-        self::assertSame('/pricing', $batch->events[0]['properties']['page_name']);
-        self::assertSame('pro', $batch->events[1]['user_properties']['$set']['plan']);
-        self::assertSame(['coins' => 3], $batch->events[2]['user_properties']['$increment']);
+        $messages = $queue->dequeue(50);
+        self::assertCount(3, $messages);
+        $e0 = json_decode($messages[0]->payload, true);
+        $e1 = json_decode($messages[1]->payload, true);
+        $e2 = json_decode($messages[2]->payload, true);
+        self::assertSame('ArrayEvent', $e0['event']);
+        self::assertSame('/pricing', $e0['properties']['page_name']);
+        self::assertSame('pro', $e1['user_properties']['$set']['plan']);
+        self::assertSame(['coins' => 3], $e2['user_properties']['$increment']);
     }
 
     public function testTrackEventRequiresAtLeastOneUserId(): void
@@ -107,21 +110,21 @@ final class ClientTrackingTest extends TestCase
         $failedEvents = null;
         $failedError = null;
         $queue = new class implements \SensorsWave\Contract\EventQueueInterface {
-            public function enqueue(array $events): void
+            public function enqueue(array $payloads): void
             {
                 throw new RuntimeException('queue down');
             }
 
-            public function dequeue(int $maxItems): ?\SensorsWave\Storage\EventBatch
+            public function dequeue(int $limit): array
             {
-                return null;
+                return [];
             }
 
-            public function ack(string $batchId): void
+            public function ack(array $messages): void
             {
             }
 
-            public function nack(string $batchId): void
+            public function nack(array $messages): void
             {
             }
         };
@@ -161,11 +164,10 @@ final class ClientTrackingTest extends TestCase
         $client->close();
 
         self::assertCount(0, $transport->requests);
-        $batch = $queue->dequeue(50);
-        self::assertNotNull($batch);
-        self::assertCount(2, $batch->events);
-        self::assertSame('BufferedOne', $batch->events[0]['event']);
-        self::assertSame('BufferedTwo', $batch->events[1]['event']);
+        $messages = $queue->dequeue(50);
+        self::assertCount(2, $messages);
+        self::assertSame('BufferedOne', json_decode($messages[0]->payload, true)['event']);
+        self::assertSame('BufferedTwo', json_decode($messages[1]->payload, true)['event']);
     }
 
     public function testFlushWritesBufferedEventsWithoutClosingClient(): void
@@ -182,13 +184,11 @@ final class ClientTrackingTest extends TestCase
         $client->trackEvent(new User('anon-2', 'user-2'), 'FlushTwo', ['step' => 2]);
         $client->close();
 
-        $firstBatch = $queue->dequeue(50);
-        $secondBatch = $queue->dequeue(50);
+        $messages = $queue->dequeue(50);
 
-        self::assertNotNull($firstBatch);
-        self::assertNotNull($secondBatch);
-        self::assertSame('FlushOne', $firstBatch->events[0]['event']);
-        self::assertSame('FlushTwo', $secondBatch->events[0]['event']);
+        self::assertCount(2, $messages);
+        self::assertSame('FlushOne', json_decode($messages[0]->payload, true)['event']);
+        self::assertSame('FlushTwo', json_decode($messages[1]->payload, true)['event']);
     }
 
     public function testTrackFlushesWhenBatchReachesFiftyEvents(): void
@@ -208,11 +208,10 @@ final class ClientTrackingTest extends TestCase
             );
         }
 
-        $batch = $queue->dequeue(50);
-        self::assertNotNull($batch);
-        self::assertCount(50, $batch->events);
-        self::assertSame('BatchEvent1', $batch->events[0]['event']);
-        self::assertSame('BatchEvent50', $batch->events[49]['event']);
+        $messages = $queue->dequeue(50);
+        self::assertCount(50, $messages);
+        self::assertSame('BatchEvent1', json_decode($messages[0]->payload, true)['event']);
+        self::assertSame('BatchEvent50', json_decode($messages[49]->payload, true)['event']);
 
         $client->close();
     }
