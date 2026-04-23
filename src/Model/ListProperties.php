@@ -33,7 +33,7 @@ final class ListProperties implements JsonSerializable
      */
     public function set(string $name, array $value): self
     {
-        $this->items[$name] = array_values($value);
+        $this->items[$name] = $value;
 
         return $this;
     }
