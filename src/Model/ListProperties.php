@@ -27,13 +27,13 @@ final class ListProperties implements JsonSerializable
     }
 
     /**
-     * 设置列表属性。
+     * 设置列表属性。原生时间值保持原类型，统一在 Event::normalize() 中归一化。
      *
      * @param list<mixed> $value
      */
     public function set(string $name, array $value): self
     {
-        $this->items[$name] = $value;
+        $this->items[$name] = array_values($value);
 
         return $this;
     }

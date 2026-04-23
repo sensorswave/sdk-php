@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\Model;
 
 use JsonSerializable;
+use SensorsWave\Support\PropertyValueNormalizer;
 
 /**
  * 用户属性操作集合。
@@ -27,7 +28,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 追加 $set 操作。
+     * 追加 $set 操作。原生时间值保持原类型，统一在 Event::normalize() 中归一化。
      */
     public function set(string $key, mixed $value): self
     {
@@ -38,7 +39,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 追加 $set_once 操作。
+     * 追加 $set_once 操作。原生时间值保持原类型，统一在 Event::normalize() 中归一化。
      */
     public function setOnce(string $key, mixed $value): self
     {
@@ -73,15 +74,13 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 追加 $union 操作并去重。
+     * 追加 $union 操作。去重在 Event::normalize() 中基于归一化后的字符串值进行。
      */
     public function union(string $key, mixed $value): self
     {
         $this->ensureListGroup('$union', $key);
         foreach ($this->normalizeListValue($value) as $item) {
-            if (!in_array($item, $this->items['$union'][$key], true)) {
-                $this->items['$union'][$key][] = $item;
-            }
+            $this->items['$union'][$key][] = $item;
         }
 
         return $this;
@@ -164,12 +163,42 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 将标量或数组统一转换为列表。
+     * 将标量或数组统一转换为列表。元素值保持原类型，统一在 Event::normalize() 中归一化。
      *
      * @return list<mixed>
      */
     private function normalizeListValue(mixed $value): array
     {
         return is_array($value) ? array_values($value) : [$value];
+    }
+
+    /**
+     * 在 Event::normalize() 中由事件归一化流程调用：递归归一化每组里的值，
+     * 并对 $union 按最终字符串相等性去重。
+     */
+    public function normalizeInPlace(): void
+    {
+        foreach ($this->items as $group => $value) {
+            if (!is_array($value)) {
+                continue;
+            }
+            $this->items[$group] = PropertyValueNormalizer::normalize($value);
+        }
+
+        if (!isset($this->items['$union']) || !is_array($this->items['$union'])) {
+            return;
+        }
+        foreach ($this->items['$union'] as $key => $list) {
+            if (!is_array($list)) {
+                continue;
+            }
+            $deduped = [];
+            foreach ($list as $item) {
+                if (!in_array($item, $deduped, true)) {
+                    $deduped[] = $item;
+                }
+            }
+            $this->items['$union'][$key] = $deduped;
+        }
     }
 }

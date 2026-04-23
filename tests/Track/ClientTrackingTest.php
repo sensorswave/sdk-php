@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SensorsWave\Tests\Track;
 
+use DateTimeImmutable;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -222,5 +223,37 @@ final class ClientTrackingTest extends TestCase
         $this->expectExceptionMessage('scheme must be http or https');
 
         Client::create('ftp://collector.example.com', 'test-token', new Config(eventQueue: new MemoryEventQueue()));
+    }
+
+    public function testProfileAppendAndUnionEncodeNativeDateTimeAsIso8601UtcStrings(): void
+    {
+        $queue = new MemoryEventQueue();
+        $client = Client::create(
+            'https://collector.example.com',
+            'test-token',
+            new Config(eventQueue: $queue)
+        );
+
+        $time = new DateTimeImmutable('2026-04-23T08:15:30.123Z');
+        $user = new User('', 'user-456');
+
+        $client->profileAppend($user, ['milestones' => [$time, $time]]);
+        $client->profileUnion($user, ['milestones' => [$time, $time]]);
+        $client->close();
+
+        $messages = $queue->dequeue(50);
+        self::assertCount(2, $messages);
+
+        $appendEvent = json_decode($messages[0]->payload, true, 512, JSON_THROW_ON_ERROR);
+        $unionEvent = json_decode($messages[1]->payload, true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(
+            ['2026-04-23T08:15:30.123Z', '2026-04-23T08:15:30.123Z'],
+            $appendEvent['user_properties']['$append']['milestones']
+        );
+        self::assertSame(
+            ['2026-04-23T08:15:30.123Z'],
+            $unionEvent['user_properties']['$union']['milestones']
+        );
     }
 }

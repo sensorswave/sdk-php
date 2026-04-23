@@ -114,6 +114,9 @@ final class Event implements JsonSerializable
         if (!$this->properties->has('$lib_version')) {
             $this->properties->set('$lib_version', SDKInfo::VERSION);
         }
+
+        $this->properties->normalizeInPlace();
+        $this->userProperties->normalizeInPlace();
     }
 
     /**

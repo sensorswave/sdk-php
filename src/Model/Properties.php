@@ -8,6 +8,7 @@ use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use JsonSerializable;
+use SensorsWave\Support\PropertyValueNormalizer;
 use Traversable;
 
 /**
@@ -43,13 +44,24 @@ final class Properties implements IteratorAggregate, Countable, JsonSerializable
     }
 
     /**
-     * 设置属性值。
+     * 设置属性值。原生时间值保持原类型，统一在 Event::normalize() 中归一化。
      */
     public function set(string $name, mixed $value): self
     {
         $this->items[$name] = $value;
 
         return $this;
+    }
+
+    /**
+     * 在 Event::normalize() 中由事件归一化流程调用：就地把原生时间值等
+     * 非字符串类型转换为统一的 ISO8601 UTC 字符串。
+     */
+    public function normalizeInPlace(): void
+    {
+        foreach ($this->items as $key => $value) {
+            $this->items[$key] = PropertyValueNormalizer::normalize($value);
+        }
     }
 
     /**

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SensorsWave\Tests\Track;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use PHPUnit\Framework\TestCase;
 use SensorsWave\Model\Event;
 use SensorsWave\Model\Properties;
@@ -61,5 +63,39 @@ final class SerializationTest extends TestCase
         // test_value TestEvent
         $this->assertNotFalse(strpos($this->name(), 'Track005'));
         $this->testEventSerializerProducesExpectedJsonShape();
+    }
+
+    public function testEventSerializerUsesIso8601UtcFormatForNativePropertyDateTime(): void
+    {
+        $event = Event::create('anon-123', 'user-456', 'TimeProbe')
+            ->withTime(1776932130123)
+            ->withProperties(
+                Properties::create()
+                    ->set('native_time', new DateTimeImmutable('2026-04-23T08:15:30.123Z'))
+                    ->set('literal_time', '2026-04-23 08:15:30.123')
+            );
+        $event->normalize();
+
+        $decoded = json_decode(EventSerializer::serialize($event), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(1776932130123, $decoded['time']);
+        self::assertSame('2026-04-23T08:15:30.123Z', $decoded['properties']['native_time']);
+        self::assertSame('2026-04-23 08:15:30.123', $decoded['properties']['literal_time']);
+    }
+
+    public function testProfileSetSerializationUsesIso8601UtcFormatForNativePropertyDateTime(): void
+    {
+        $event = UserPropertyEventFactory::profileSet(
+            new User('', 'user-456'),
+            Properties::create()
+                ->set('registered_at', new DateTimeImmutable('2026-04-23T08:15:30.123Z'))
+                ->set('literal_time', '2026-04-23 08:15:30.123')
+        )->withTime(1776932130123);
+
+        $event->normalize();
+        $decoded = json_decode(EventSerializer::serialize($event), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame('2026-04-23T08:15:30.123Z', $decoded['user_properties']['$set']['registered_at']);
+        self::assertSame('2026-04-23 08:15:30.123', $decoded['user_properties']['$set']['literal_time']);
     }
 }

@@ -76,7 +76,9 @@ final class ModelTest extends TestCase
         self::assertSame('2026-03-19 12:00:00', $options->group('$set_once')['created_at']);
         self::assertSame(2, $options->group('$increment')['score']);
         self::assertSame(['vip', 'beta'], $options->group('$append')['tags']);
-        self::assertSame(['admin', 'owner'], $options->group('$union')['roles']);
+        // $union setter is append-only; dedupe happens in Event::normalize()
+        // based on final ISO8601 UTC strings.
+        self::assertSame(['admin', 'admin', 'owner'], $options->group('$union')['roles']);
         self::assertArrayHasKey('legacy_field', $options->group('$unset'));
         self::assertTrue($options->isDeleteSet());
     }
