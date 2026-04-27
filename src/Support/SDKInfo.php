@@ -9,10 +9,8 @@ namespace SensorsWave\Support;
  */
 final class SDKInfo
 {
-    public const TYPE = 'php';
-    public const VERSION = '0.1.0';
+    public const TYPE = "php";
+    public const VERSION = "0.1.1";
 
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 }
