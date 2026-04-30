@@ -14,8 +14,8 @@
 ## 功能特性
 
 - **事件埋点**：追踪用户事件，支持自定义属性
-- **用户画像**：设置、累加、追加和管理用户画像属性
-- **A/B 测试**：基于本地快照评估 Feature Gate、实验和 Feature Config
+- **用户属性**：设置、累加、追加和管理用户的各类属性
+- **A/B 测试**：基于本地快照评估功能开关、实验和功能配置
 - **自动曝光记录**：自动追踪 A/B 测试曝光事件
 - **离线运行时**：请求路径零远程 I/O — 所有网络操作均在带外执行
 - **可插拔适配器**：默认使用本地文件适配器，同时支持 Redis 适配器
@@ -261,9 +261,9 @@ $client->track($event);
 
 ---
 
-## 用户画像管理
+## 用户属性管理
 
-### 设置画像属性
+### 设置用户属性
 
 ```php
 $user = new User(anonId: 'anon-123', loginId: 'user-456');
@@ -312,7 +312,7 @@ $client->profileUnion($user, ListProperties::create()->set('categories', ['sport
 $client->profileUnset($user, 'temp_field', 'old_field');
 ```
 
-### 删除用户画像
+### 清空用户全部属性
 
 ```php
 $client->profileDelete($user);
@@ -324,7 +324,7 @@ $client->profileDelete($user);
 
 PHP 客户端仅从本地快照评估 A/B 测试。如果快照缺失或过期，Gate 检查将返回默认值（fail closed）。客户端在请求路径上不会回退到远程元数据刷新。
 
-### 检查 Feature Gate
+### 检查功能开关
 
 ```php
 $pass = $client->checkFeatureGate($user, 'new_checkout_flow');
@@ -335,7 +335,7 @@ if ($pass) {
 }
 ```
 
-### 获取 Feature Config 值
+### 获取功能配置值
 
 ```php
 $result = $client->getFeatureConfig($user, 'button_color_config');
@@ -392,24 +392,24 @@ switch ($strategy) {
 | **trackEvent** | `trackEvent(User $user, string $eventName, array\|Properties $properties = []): void` | 追踪用户行为的主要方法，支持自定义属性 |
 | **track** | `track(Event $event): void` | 底层 API，用于高级场景；常规用法请使用 `trackEvent` |
 
-### 用户画像操作
+### 用户属性操作
 
 | 方法 | 签名 | 说明 | 使用场景 |
 |------|------|------|----------|
-| **profileSet** | `profileSet(User $user, array\|Properties $properties): void` | 设置或覆盖画像属性 | 更新用户名、邮箱、设置 |
+| **profileSet** | `profileSet(User $user, array\|Properties $properties): void` | 设置或覆盖用户属性 | 更新用户名、邮箱、设置 |
 | **profileSetOnce** | `profileSetOnce(User $user, array\|Properties $properties): void` | 仅在属性不存在时设置 | 记录注册日期、首次来源 |
 | **profileIncrement** | `profileIncrement(User $user, array\|Properties $properties): void` | 累加数值属性 | 登录次数、积分、分数 |
 | **profileAppend** | `profileAppend(User $user, array\|ListProperties $properties): void` | 追加到列表属性（允许重复） | 添加购买记录、活动日志 |
 | **profileUnion** | `profileUnion(User $user, array\|ListProperties $properties): void` | 向列表属性添加唯一值 | 添加兴趣、标签、分类 |
 | **profileUnset** | `profileUnset(User $user, string ...$propertyKeys): void` | 删除指定属性 | 清除临时或废弃字段 |
-| **profileDelete** | `profileDelete(User $user): void` | 删除整个用户画像（不可逆） | GDPR 数据删除请求 |
+| **profileDelete** | `profileDelete(User $user): void` | 清空用户全部属性（不可逆） | GDPR 数据删除请求 |
 
 ### A/B 测试
 
 | 方法 | 签名 | 说明 |
 |------|------|------|
-| **checkFeatureGate** | `checkFeatureGate(User $user, string $key): bool` | 评估 Feature Gate。未找到或类型不匹配时返回 `false` |
-| **getFeatureConfig** | `getFeatureConfig(User $user, string $key): ABResult` | 评估 Feature Config。未找到时返回空结果 |
+| **checkFeatureGate** | `checkFeatureGate(User $user, string $key): bool` | 评估功能开关。未找到或类型不匹配时返回 `false` |
+| **getFeatureConfig** | `getFeatureConfig(User $user, string $key): ABResult` | 评估功能配置。未找到时返回空结果 |
 | **getExperiment** | `getExperiment(User $user, string $key): ABResult` | 评估实验。未找到时返回空结果 |
 | **evaluateAll** | `evaluateAll(User $user): array` | 评估所有已加载的规则并记录曝光 |
 | **getABSpecs** | `getABSpecs(): string` | 导出当前 A/B 元数据快照为 JSON，用于缓存 |
@@ -419,7 +419,7 @@ switch ($strategy) {
 ## 复杂属性输入约定
 
 SDK 接受 `Object`（关联数组）和 `Object Array`（关联数组组成的索引数组）作为事件
-属性和 `profileSet` / `profileSetOnce` 画像属性的值。**SDK 对属性值采用 pass-through
+属性和 `profileSet` / `profileSetOnce` 用户属性的值。**SDK 对属性值采用 pass-through
 策略，不做内容校验**；服务端可能对超出下表限制的值静默截断、丢弃或做其它 sanitize
 处理。调用方应自行约束输入以避免数据被悄无声息修改。
 
@@ -431,7 +431,7 @@ SDK 接受 `Object`（关联数组）和 `Object Array`（关联数组组成的�
 
 超出任一限制时服务端可能静默截断/丢弃。
 
-### 列表型画像操作
+### 列表型用户属性操作
 
 `profileAppend` 与 `profileUnion` 是列表操作，**不接受 `Object`（关联数组）或
 `Object Array`（关联数组组成的索引数组）值**。请仅传入标量。SDK 不会在这里拒绝
@@ -654,7 +654,7 @@ $client = Client::create(
 
 ## 运行示例
 
-事件埋点 / 身份关联 / 画像设置示例：
+事件埋点 / 身份关联 / 用户属性设置示例：
 
 ```bash
 php example/track_example.php \
