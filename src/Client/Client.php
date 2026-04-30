@@ -99,6 +99,16 @@ final class Client
 
     /**
      * 发送自定义事件。
+     *
+     * Complex property input conventions (server-side limits; the SDK
+     * does not validate, exceeding any of these may be silently
+     * truncated/dropped by the server):
+     *  - properties array: at most 256 caller-supplied keys per event
+     *  - any string value: at most 1024 UTF-8 bytes
+     *  - OBJECT_ARRAY (list whose elements are associative arrays):
+     *    at most 100 elements
+     *
+     * See README "Complex Property Input Conventions" for details.
      */
     public function trackEvent(User $user, string $eventName, array|Properties $properties = []): void
     {
@@ -113,6 +123,9 @@ final class Client
 
     /**
      * 直接发送完整事件对象。
+     *
+     * The Event's properties and user_properties are subject to the same
+     * conventions as trackEvent (see trackEvent doc for details).
      */
     public function track(Event $event): void
     {
@@ -126,7 +139,15 @@ final class Client
     }
 
     /**
-     * 发送 profile set 事件。
+     * 发送 profile set 事件。Object 与 Object Array 值会原样传递给服务端。
+     *
+     * Complex property input conventions (server-side limits; the SDK
+     * does not validate):
+     *  - any string value: at most 1024 UTF-8 bytes
+     *  - OBJECT_ARRAY (list whose elements are associative arrays):
+     *    at most 100 elements
+     *
+     * See README "Complex Property Input Conventions" for details.
      */
     public function profileSet(User $user, array|Properties $properties): void
     {
@@ -135,7 +156,15 @@ final class Client
     }
 
     /**
-     * 发送 profile set once 事件。
+     * 发送 profile set once 事件。Object 与 Object Array 值会原样传递给服务端。
+     *
+     * Complex property input conventions (server-side limits; the SDK
+     * does not validate):
+     *  - any string value: at most 1024 UTF-8 bytes
+     *  - OBJECT_ARRAY (list whose elements are associative arrays):
+     *    at most 100 elements
+     *
+     * See README "Complex Property Input Conventions" for details.
      */
     public function profileSetOnce(User $user, array|Properties $properties): void
     {
@@ -167,7 +196,17 @@ final class Client
     }
 
     /**
-     * 发送 profile append 事件。
+     * 发送 profile append 事件。值必须是仅含标量元素的列表。
+     *
+     * Object（关联数组）与 Object Array（关联数组组成的索引数组）值**不被
+     * 接受**。SDK 不会拒绝，但服务端会推断为 OBJECT_ARRAY，与列表语义不符。
+     * 请仅传入标量。
+     *
+     * Complex property input conventions (server-side limits; the SDK
+     * does not validate):
+     *  - any string value: at most 1024 UTF-8 bytes
+     *
+     * See README "Complex Property Input Conventions" for details.
      */
     public function profileAppend(User $user, array|ListProperties $properties): void
     {
@@ -181,7 +220,17 @@ final class Client
     }
 
     /**
-     * 发送 profile union 事件。
+     * 发送 profile union 事件。值必须是仅含标量元素的列表（自动去重）。
+     *
+     * Object（关联数组）与 Object Array（关联数组组成的索引数组）值**不被
+     * 接受**。SDK 不会拒绝，但服务端会推断为 OBJECT_ARRAY，与列表语义不符。
+     * 请仅传入标量。
+     *
+     * Complex property input conventions (server-side limits; the SDK
+     * does not validate):
+     *  - any string value: at most 1024 UTF-8 bytes
+     *
+     * See README "Complex Property Input Conventions" for details.
      */
     public function profileUnion(User $user, array|ListProperties $properties): void
     {

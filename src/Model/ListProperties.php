@@ -7,7 +7,13 @@ namespace SensorsWave\Model;
 use JsonSerializable;
 
 /**
- * 列表型属性集合。
+ * 列表型属性集合（用于 profileAppend / profileUnion）。
+ *
+ * 每个 value 应是仅含标量元素的列表。Object（关联数组）与 Object Array
+ * （关联数组组成的索引数组）值**不被接受**——SDK 不会拒绝，但服务端
+ * 会推断为 OBJECT_ARRAY，与列表语义不符。
+ *
+ * See README "Complex Property Input Conventions" for details.
  */
 final class ListProperties implements JsonSerializable
 {
