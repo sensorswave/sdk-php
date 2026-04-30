@@ -7,7 +7,7 @@ namespace SensorsWave\Exception;
 use InvalidArgumentException;
 
 /**
- * 当 login_id 与 anon_id 同时为空时抛出。
+ * Thrown when both login_id and anon_id are empty.
  */
 final class EmptyUserIdsException extends InvalidArgumentException
 {

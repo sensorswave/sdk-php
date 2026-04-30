@@ -12,7 +12,7 @@ use SensorsWave\Http\TransportInterface;
 use SensorsWave\Storage\QueueMessage;
 
 /**
- * 事件发送任务。
+ * Worker that drains the local event queue and posts batches to the server.
  */
 final class SendCommand
 {

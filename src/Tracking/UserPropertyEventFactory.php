@@ -10,12 +10,12 @@ use SensorsWave\Model\User;
 use SensorsWave\Model\UserPropertyOptions;
 
 /**
- * 用户属性事件构造器。
+ * Factory for user-property events.
  */
 final class UserPropertyEventFactory
 {
     /**
-     * 创建 profile set 事件。
+     * Build a profile set event.
      */
     public static function profileSet(User $user, Properties $properties): Event
     {

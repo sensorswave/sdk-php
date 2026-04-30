@@ -8,12 +8,12 @@ use JsonException;
 use SensorsWave\Model\Event;
 
 /**
- * 事件序列化器。
+ * Event serializer.
  */
 final class EventSerializer
 {
     /**
-     * 序列化单条事件。
+     * Serialize a single event to JSON.
      *
      * @throws JsonException
      */
@@ -23,7 +23,7 @@ final class EventSerializer
     }
 
     /**
-     * 序列化批量事件。
+     * Serialize a batch of events to JSON.
      *
      * @param list<Event> $events
      *

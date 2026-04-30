@@ -12,7 +12,7 @@ use SensorsWave\Storage\LocalFileEventQueue;
 use SensorsWave\Support\DefaultLogger;
 
 /**
- * SDK 运行配置。
+ * SDK runtime configuration.
  */
 final class Config
 {

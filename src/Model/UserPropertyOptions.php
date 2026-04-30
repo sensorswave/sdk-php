@@ -8,7 +8,7 @@ use JsonSerializable;
 use SensorsWave\Support\PropertyValueNormalizer;
 
 /**
- * 用户属性操作集合。
+ * Collection of user-property operations.
  */
 final class UserPropertyOptions implements JsonSerializable
 {
@@ -20,7 +20,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 创建新的用户属性操作对象。
+     * Create a new empty options object.
      */
     public static function create(): self
     {
@@ -28,7 +28,8 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 追加 $set 操作。原生时间值保持原类型，统一在 Event::normalize() 中归一化。
+     * Append a $set operation. Native time values are kept as-is and
+     * normalized inside Event::normalize().
      */
     public function set(string $key, mixed $value): self
     {
@@ -39,7 +40,8 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 追加 $set_once 操作。原生时间值保持原类型，统一在 Event::normalize() 中归一化。
+     * Append a $set_once operation. Native time values are kept as-is and
+     * normalized inside Event::normalize().
      */
     public function setOnce(string $key, mixed $value): self
     {
@@ -50,7 +52,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 追加 $increment 操作。
+     * Append a $increment operation.
      */
     public function increment(string $key, int|float $value): self
     {
@@ -61,7 +63,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 追加 $append 操作。
+     * Append a $append operation.
      */
     public function append(string $key, mixed $value): self
     {
@@ -74,7 +76,8 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 追加 $union 操作。去重在 Event::normalize() 中基于归一化后的字符串值进行。
+     * Append a $union operation. Deduplication runs in Event::normalize()
+     * against normalized string values.
      */
     public function union(string $key, mixed $value): self
     {
@@ -87,7 +90,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 追加 $unset 操作。
+     * Append a $unset operation.
      */
     public function unset(string $key): self
     {
@@ -98,7 +101,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 标记 $delete 操作。
+     * Mark a $delete operation.
      */
     public function delete(): self
     {
@@ -108,7 +111,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 返回指定操作组。
+     * Return the named operation group.
      *
      * @return array<string, mixed>|list<mixed>|array<int, mixed>
      */
@@ -119,7 +122,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 判断是否设置了删除标记。
+     * Return whether the delete flag is set.
      */
     public function isDeleteSet(): bool
     {
@@ -127,7 +130,7 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 导出原始数组。
+     * Return the raw associative array.
      *
      * @return array<string, mixed>
      */
@@ -173,8 +176,8 @@ final class UserPropertyOptions implements JsonSerializable
     }
 
     /**
-     * 在 Event::normalize() 中由事件归一化流程调用：递归归一化每组里的值，
-     * 并对 $union 按最终字符串相等性去重。
+     * Called by Event::normalize(): recursively normalizes the values in
+     * every group and deduplicates $union by final string equality.
      */
     public function normalizeInPlace(): void
     {

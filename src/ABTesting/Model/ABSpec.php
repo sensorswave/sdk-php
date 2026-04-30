@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\ABTesting\Model;
 
 /**
- * A/B 实验规格。
+ * A/B spec definition.
  */
 final class ABSpec
 {
@@ -31,7 +31,7 @@ final class ABSpec
     }
 
     /**
-     * 从数组创建规格对象。
+     * Build a spec from a decoded payload array.
      *
      * @param array<string, mixed> $data
      */
@@ -80,7 +80,7 @@ final class ABSpec
     }
 
     /**
-     * 导出为数组。
+     * Export as an associative array.
      *
      * @return array<string, mixed>
      */

@@ -11,7 +11,7 @@ use SensorsWave\Support\SDKInfo;
 use SensorsWave\Support\Uuid;
 
 /**
- * 单条事件对象。
+ * Single event payload.
  */
 final class Event implements JsonSerializable
 {
@@ -27,7 +27,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 创建新的事件对象。
+     * Create a new event.
      */
     public static function create(string $anonId, string $loginId, string $event): self
     {
@@ -43,7 +43,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 覆盖 trace ID。
+     * Return a copy with the given trace ID.
      */
     public function withTraceId(string $traceId): self
     {
@@ -54,7 +54,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 覆盖事件时间。
+     * Return a copy with the given event time.
      */
     public function withTime(int $time): self
     {
@@ -65,7 +65,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 覆盖事件属性。
+     * Return a copy with the given properties.
      */
     public function withProperties(Properties $properties): self
     {
@@ -76,7 +76,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 覆盖用户属性操作。
+     * Return a copy with the given user-property options.
      */
     public function withUserPropertyOptions(UserPropertyOptions $options): self
     {
@@ -87,7 +87,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 归一化事件内容并注入默认属性。
+     * Normalize the event payload and inject default properties.
      */
     public function normalize(): void
     {
@@ -120,7 +120,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 返回事件时间。
+     * Return the event time.
      */
     public function time(): int
     {
@@ -128,7 +128,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 返回 trace ID。
+     * Return the trace ID.
      */
     public function traceId(): string
     {
@@ -136,7 +136,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 返回事件属性。
+     * Return the event properties.
      */
     public function properties(): Properties
     {
@@ -144,7 +144,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 返回匿名 ID。
+     * Return the anonymous ID.
      */
     public function anonId(): string
     {
@@ -152,7 +152,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 返回登录 ID。
+     * Return the login ID.
      */
     public function loginId(): string
     {
@@ -160,7 +160,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 返回用户属性操作集合。
+     * Return the user-property options.
      */
     public function userProperties(): UserPropertyOptions
     {
@@ -168,7 +168,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 返回事件名。
+     * Return the event name.
      */
     public function event(): string
     {
@@ -176,7 +176,7 @@ final class Event implements JsonSerializable
     }
 
     /**
-     * 导出 JSON。
+     * Export as a JSON-encodable array.
      *
      * @return array<string, mixed>
      */

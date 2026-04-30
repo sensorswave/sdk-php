@@ -13,7 +13,7 @@ use SensorsWave\Signing\RequestSigner;
 use SensorsWave\Support\SDKInfo;
 
 /**
- * 基于 ACS3-HMAC-SHA256 的远程元数据加载器。
+ * Remote metadata loader using ACS3-HMAC-SHA256 signed requests.
  */
 final class HttpSignatureMetaLoader
 {
@@ -30,7 +30,7 @@ final class HttpSignatureMetaLoader
     }
 
     /**
-     * 拉取并解析远程 A/B 元数据快照。
+     * Fetch and parse the remote A/B metadata snapshot.
      */
     public function load(): Storage
     {
@@ -38,7 +38,7 @@ final class HttpSignatureMetaLoader
     }
 
     /**
-     * 拉取并解析远程 A/B 元数据结果。
+     * Fetch and parse the remote A/B metadata response.
      */
     public function loadResult(): MetaLoadResult
     {

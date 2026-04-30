@@ -8,7 +8,7 @@ use SensorsWave\ABTesting\Model\ABEnv;
 use SensorsWave\ABTesting\Model\ABSpec;
 
 /**
- * A/B 元数据快照。
+ * A/B metadata snapshot.
  */
 final class Storage
 {
@@ -23,7 +23,7 @@ final class Storage
     }
 
     /**
-     * 判断是否存在指定 spec。
+     * Return whether the given spec exists.
      */
     public function hasSpec(string $key): bool
     {
@@ -31,7 +31,7 @@ final class Storage
     }
 
     /**
-     * 获取指定 spec。
+     * Return the spec for the given key, or null.
      */
     public function getSpec(string $key): ?ABSpec
     {
@@ -39,7 +39,7 @@ final class Storage
     }
 
     /**
-     * 返回全部 spec。
+     * Return every spec keyed by spec key.
      *
      * @return array<string, ABSpec>
      */
@@ -49,7 +49,7 @@ final class Storage
     }
 
     /**
-     * 导出为可回灌的 JSON 结构。
+     * Export as a JSON-encodable structure that can be reloaded.
      *
      * @return array<string, mixed>
      */

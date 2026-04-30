@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\ABTesting\Model;
 
 /**
- * A/B 环境配置。
+ * A/B environment configuration.
  */
 final class ABEnv
 {
@@ -15,7 +15,7 @@ final class ABEnv
     }
 
     /**
-     * 从数组创建环境对象。
+     * Build an env from a decoded payload array.
      *
      * @param array<string, mixed> $data
      */
@@ -25,7 +25,7 @@ final class ABEnv
     }
 
     /**
-     * 导出为数组。
+     * Export as an associative array.
      *
      * @return array<string, bool>
      */

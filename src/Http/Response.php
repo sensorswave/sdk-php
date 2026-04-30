@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\Http;
 
 /**
- * HTTP 响应对象。
+ * HTTP response payload.
  */
 final class Response
 {

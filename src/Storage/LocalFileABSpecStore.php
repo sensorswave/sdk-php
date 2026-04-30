@@ -8,7 +8,7 @@ use RuntimeException;
 use SensorsWave\Contract\ABSpecStoreInterface;
 
 /**
- * 基于本地文件的 A/B snapshot 存储。
+ * Local-file backed A/B snapshot store.
  */
 final class LocalFileABSpecStore implements ABSpecStoreInterface
 {

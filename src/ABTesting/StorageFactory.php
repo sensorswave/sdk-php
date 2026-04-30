@@ -9,12 +9,12 @@ use SensorsWave\ABTesting\Model\ABEnv;
 use SensorsWave\ABTesting\Model\ABSpec;
 
 /**
- * A/B storage 构造器。
+ * Factory for the A/B Storage snapshot.
  */
 final class StorageFactory
 {
     /**
-     * 从数组创建 storage。
+     * Build a Storage from a decoded payload array.
      *
      * @param array<string, mixed> $payload
      */
@@ -44,7 +44,7 @@ final class StorageFactory
     }
 
     /**
-     * 从 JSON 字符串创建 storage。
+     * Build a Storage from a JSON string.
      *
      * @throws JsonException
      */

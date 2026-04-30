@@ -7,11 +7,12 @@ namespace SensorsWave\Model;
 use JsonSerializable;
 
 /**
- * 列表型属性集合（用于 profileAppend / profileUnion）。
+ * List-shaped property collection used by profileAppend / profileUnion.
  *
- * 每个 value 应是仅含标量元素的列表。Object（关联数组）与 Object Array
- * （关联数组组成的索引数组）值**不被接受**——SDK 不会拒绝，但服务端
- * 会推断为 OBJECT_ARRAY，与列表语义不符。
+ * Each value must be a list of scalars. Object (associative array) and
+ * Object Array (indexed array of associative arrays) values are **not
+ * accepted**: the SDK does not reject them, but the server will infer
+ * them as OBJECT_ARRAY, which contradicts list semantics.
  *
  * See README "Complex Property Input Conventions" for details.
  */
@@ -25,7 +26,7 @@ final class ListProperties implements JsonSerializable
     }
 
     /**
-     * 创建新的列表属性对象。
+     * Create an empty list-property bag.
      */
     public static function create(): self
     {
@@ -33,7 +34,8 @@ final class ListProperties implements JsonSerializable
     }
 
     /**
-     * 设置列表属性。原生时间值保持原类型，统一在 Event::normalize() 中归一化。
+     * Set a list-shaped property. Native time values are kept as-is and
+     * normalized inside Event::normalize().
      *
      * @param list<mixed> $value
      */
@@ -45,7 +47,7 @@ final class ListProperties implements JsonSerializable
     }
 
     /**
-     * 导出原始数组。
+     * Return the raw associative array.
      *
      * @return array<string, list<mixed>>
      */

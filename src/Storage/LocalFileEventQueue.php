@@ -9,7 +9,7 @@ use RuntimeException;
 use SensorsWave\Contract\EventQueueInterface;
 
 /**
- * 基于本地文件的事件队列。
+ * Local-file backed event queue.
  */
 final class LocalFileEventQueue implements EventQueueInterface
 {

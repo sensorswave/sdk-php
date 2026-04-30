@@ -12,12 +12,12 @@ use SensorsWave\Model\User;
 use SensorsWave\Model\UserPropertyOptions;
 
 /**
- * 曝光事件构造器。
+ * Factory for A/B impression events.
  */
 final class ABImpressionFactory
 {
     /**
-     * 创建曝光事件。
+     * Build an impression event for the given evaluation result.
      */
     public static function create(User $user, ABResult $result): Event
     {

@@ -14,7 +14,7 @@ use SensorsWave\Contract\StickyHandlerInterface;
 use SensorsWave\Model\User;
 
 /**
- * A/B 求值核心。
+ * A/B evaluation core.
  */
 final class ABCore
 {
@@ -33,7 +33,7 @@ final class ABCore
     }
 
     /**
-     * 执行单个 key 的求值。
+     * Evaluate a single spec by key.
      */
     public function evaluate(User $user, string $key, ?int $type = null): ABResult
     {
@@ -50,7 +50,7 @@ final class ABCore
     }
 
     /**
-     * 批量评估当前 storage 中的全部 spec。
+     * Evaluate every spec in the current storage snapshot.
      *
      * @return list<ABResult>
      */
@@ -68,7 +68,7 @@ final class ABCore
     }
 
     /**
-     * 导出当前 storage 快照。
+     * Export the current storage snapshot as JSON.
      *
      * @throws JsonException
      */
@@ -78,7 +78,7 @@ final class ABCore
     }
 
     /**
-     * 替换当前 storage。
+     * Replace the storage snapshot in place.
      */
     public function replaceStorage(Storage $storage): void
     {
@@ -86,7 +86,7 @@ final class ABCore
     }
 
     /**
-     * 返回当前 storage 的更新时间。
+     * Return the snapshot update time.
      */
     public function storageUpdateTime(): int
     {

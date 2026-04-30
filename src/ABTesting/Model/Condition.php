@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\ABTesting\Model;
 
 /**
- * A/B 规则条件。
+ * A/B rule condition.
  */
 final class Condition
 {
@@ -18,7 +18,7 @@ final class Condition
     }
 
     /**
-     * 从数组创建条件对象。
+     * Build a condition from a decoded payload array.
      *
      * @param array<string, mixed> $data
      */
@@ -33,7 +33,7 @@ final class Condition
     }
 
     /**
-     * 导出为数组。
+     * Export as an associative array.
      *
      * @return array<string, mixed>
      */

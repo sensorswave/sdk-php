@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace SensorsWave\Contract;
 
 /**
- * Redis 客户端最小抽象，避免绑定具体扩展。
+ * Minimal Redis client abstraction so the SDK does not depend on a specific
+ * extension.
  *
- * 所有 key 建议使用 hash tag（如 {sensorswave}:xxx）以兼容 Redis Cluster。
+ * All keys should use a hash tag (e.g. {sensorswave}:xxx) for Redis Cluster
+ * compatibility.
  */
 interface RedisClientInterface
 {
@@ -33,12 +35,12 @@ interface RedisClientInterface
     public function lTrim(string $key, int $start, int $stop): bool;
 
     /**
-     * 执行 Lua 脚本。
+     * Run a Lua script.
      *
-     * @param string   $script Lua 脚本内容
-     * @param list<string> $keys   KEYS 参数
-     * @param list<string|int> $args   ARGV 参数
-     * @return mixed 脚本返回值
+     * @param string           $script Lua script source
+     * @param list<string>     $keys   KEYS arguments
+     * @param list<string|int> $args   ARGV arguments
+     * @return mixed Script return value
      */
     public function eval(string $script, array $keys = [], array $args = []): mixed;
 }

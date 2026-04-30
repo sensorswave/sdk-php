@@ -7,7 +7,7 @@ namespace SensorsWave\Exception;
 use InvalidArgumentException;
 
 /**
- * Identify 缺少双 ID 时抛出。
+ * Thrown when identify() is called without both IDs being non-empty.
  */
 final class IdentifyRequiresBothIdsException extends InvalidArgumentException
 {

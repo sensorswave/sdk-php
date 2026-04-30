@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\Contract;
 
 /**
- * A/B snapshot 存储抽象。
+ * Storage abstraction for the A/B snapshot.
  */
 interface ABSpecStoreInterface
 {

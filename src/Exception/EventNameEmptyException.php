@@ -7,7 +7,7 @@ namespace SensorsWave\Exception;
 use InvalidArgumentException;
 
 /**
- * 当事件名为空时抛出。
+ * Thrown when the event name is empty.
  */
 final class EventNameEmptyException extends InvalidArgumentException
 {

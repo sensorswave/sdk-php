@@ -10,7 +10,7 @@ use SensorsWave\Contract\EventQueueInterface;
 use SensorsWave\Contract\RedisClientInterface;
 
 /**
- * 基于 Redis 的事件队列。
+ * Redis-backed event queue.
  */
 final class RedisEventQueue implements EventQueueInterface
 {

@@ -5,27 +5,27 @@ declare(strict_types=1);
 namespace SensorsWave\Contract;
 
 /**
- * SDK 日志接口。
+ * SDK logging interface.
  */
 interface LoggerInterface
 {
     /**
-     * 输出调试日志。
+     * Emit a debug log.
      */
     public function debug(string $message, mixed ...$context): void;
 
     /**
-     * 输出信息日志。
+     * Emit an info log.
      */
     public function info(string $message, mixed ...$context): void;
 
     /**
-     * 输出告警日志。
+     * Emit a warning log.
      */
     public function warn(string $message, mixed ...$context): void;
 
     /**
-     * 输出错误日志。
+     * Emit an error log.
      */
     public function error(string $message, mixed ...$context): void;
 }

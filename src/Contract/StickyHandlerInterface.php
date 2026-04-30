@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace SensorsWave\Contract;
 
 /**
- * Sticky 结果持久化接口。
+ * Persistence interface for sticky bucketing results.
  */
 interface StickyHandlerInterface
 {
     /**
-     * 读取 sticky 结果。
+     * Load a sticky bucketing result.
      */
     public function getStickyResult(string $key): ?string;
 
     /**
-     * 写入 sticky 结果。
+     * Store a sticky bucketing result.
      */
     public function setStickyResult(string $key, string $result): void;
 }

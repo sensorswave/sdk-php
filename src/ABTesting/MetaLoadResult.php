@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\ABTesting;
 
 /**
- * 远程元数据加载结果。
+ * Result of a remote metadata load.
  */
 final class MetaLoadResult
 {

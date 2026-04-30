@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace SensorsWave\Support;
 
 /**
- * 哈希与签名辅助方法。
+ * Hashing helpers used by the signer.
  */
 final class Hash
 {
     /**
-     * 计算 SHA-256 十六进制摘要。
+     * Compute the SHA-256 hex digest.
      */
     public static function sha256Hex(string $data): string
     {
@@ -18,7 +18,7 @@ final class Hash
     }
 
     /**
-     * 计算 HMAC-SHA256 十六进制摘要。
+     * Compute the HMAC-SHA256 hex digest.
      */
     public static function hmacSha256Hex(string $key, string $data): string
     {

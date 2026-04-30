@@ -7,14 +7,15 @@ namespace SensorsWave\Signing;
 use SensorsWave\Support\Hash;
 
 /**
- * ACS3-HMAC-SHA256 请求签名器。
+ * ACS3-HMAC-SHA256 request signer.
  */
 final class RequestSigner
 {
     public const ALGORITHM = 'ACS3-HMAC-SHA256';
 
     /**
-     * 为请求生成签名并写回必要请求头。
+     * Compute the request signature and write the required headers back into
+     * $headers.
      *
      * @param array<string, string> $headers
      */

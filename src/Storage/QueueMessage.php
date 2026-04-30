@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\Storage;
 
 /**
- * 队列消息：不透明 receipt + 原始 payload。
+ * Queue message: opaque receipt plus the original payload.
  */
 final class QueueMessage
 {

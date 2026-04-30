@@ -7,7 +7,7 @@ namespace SensorsWave\ABTesting;
 use JsonException;
 
 /**
- * A/B 求值结果。
+ * A/B evaluation result.
  */
 final class ABResult
 {
@@ -26,7 +26,7 @@ final class ABResult
     }
 
     /**
-     * 判断 gate 是否命中。
+     * Return whether the feature gate passes.
      */
     public function checkFeatureGate(): bool
     {
@@ -34,7 +34,7 @@ final class ABResult
     }
 
     /**
-     * 读取字符串参数。
+     * Read a string parameter from the variant payload.
      */
     public function getString(string $key, string $fallback): string
     {
@@ -43,7 +43,7 @@ final class ABResult
     }
 
     /**
-     * 读取数值参数。
+     * Read a numeric parameter from the variant payload.
      */
     public function getNumber(string $key, float $fallback): float
     {
@@ -52,7 +52,7 @@ final class ABResult
     }
 
     /**
-     * 读取布尔参数。
+     * Read a boolean parameter from the variant payload.
      */
     public function getBool(string $key, bool $fallback): bool
     {
@@ -61,7 +61,7 @@ final class ABResult
     }
 
     /**
-     * 读取列表参数。
+     * Read a list parameter from the variant payload.
      *
      * @param list<mixed> $fallback
      *
@@ -74,7 +74,7 @@ final class ABResult
     }
 
     /**
-     * 读取字典参数。
+     * Read a map parameter from the variant payload.
      *
      * @param array<string, mixed> $fallback
      *
@@ -87,7 +87,7 @@ final class ABResult
     }
 
     /**
-     * 以 JSON 形式导出当前 payload。
+     * Export the variant payload as a JSON string.
      *
      * @throws JsonException
      */

@@ -12,7 +12,7 @@ use SensorsWave\Support\PropertyValueNormalizer;
 use Traversable;
 
 /**
- * 事件属性集合。
+ * Collection of event properties.
  *
  * Values may be scalars (string, int, float, bool, \DateTimeInterface),
  * Object (nested associative array), or Object Array (indexed array of
@@ -39,7 +39,7 @@ final class Properties implements IteratorAggregate, Countable, JsonSerializable
     }
 
     /**
-     * 创建新的属性对象。
+     * Create an empty property bag.
      */
     public static function create(): self
     {
@@ -47,7 +47,7 @@ final class Properties implements IteratorAggregate, Countable, JsonSerializable
     }
 
     /**
-     * 从数组创建属性对象。
+     * Create a property bag from an associative array.
      *
      * @param array<string, mixed> $items
      */
@@ -57,7 +57,8 @@ final class Properties implements IteratorAggregate, Countable, JsonSerializable
     }
 
     /**
-     * 设置属性值。原生时间值保持原类型，统一在 Event::normalize() 中归一化。
+     * Set a property value. Native time values are kept as-is and normalized
+     * inside Event::normalize().
      */
     public function set(string $name, mixed $value): self
     {
@@ -67,8 +68,8 @@ final class Properties implements IteratorAggregate, Countable, JsonSerializable
     }
 
     /**
-     * 在 Event::normalize() 中由事件归一化流程调用：就地把原生时间值等
-     * 非字符串类型转换为统一的 ISO8601 UTC 字符串。
+     * Called by Event::normalize(): converts native time values and other
+     * non-string types into the canonical ISO8601 UTC string in place.
      */
     public function normalizeInPlace(): void
     {
@@ -78,7 +79,7 @@ final class Properties implements IteratorAggregate, Countable, JsonSerializable
     }
 
     /**
-     * 合并属性集合。
+     * Merge another property bag into this one.
      */
     public function merge(self $properties): self
     {
@@ -90,7 +91,7 @@ final class Properties implements IteratorAggregate, Countable, JsonSerializable
     }
 
     /**
-     * 获取属性值。
+     * Get a property value.
      */
     public function get(string $name, mixed $default = null): mixed
     {
@@ -98,7 +99,7 @@ final class Properties implements IteratorAggregate, Countable, JsonSerializable
     }
 
     /**
-     * 判断属性是否存在。
+     * Return whether the property is set.
      */
     public function has(string $name): bool
     {
@@ -106,7 +107,7 @@ final class Properties implements IteratorAggregate, Countable, JsonSerializable
     }
 
     /**
-     * 导出原始数组。
+     * Return the raw associative array.
      *
      * @return array<string, mixed>
      */

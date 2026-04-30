@@ -9,7 +9,7 @@ use SensorsWave\Contract\StickyHandlerInterface;
 use SensorsWave\Storage\LocalFileABSpecStore;
 
 /**
- * A/B 能力配置。
+ * A/B capability configuration.
  */
 final class ABConfig
 {

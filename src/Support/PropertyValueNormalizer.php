@@ -9,12 +9,12 @@ use DateTimeInterface;
 use DateTimeZone;
 
 /**
- * 统一规范化非顶层属性值。
+ * Normalizes nested property values into the canonical wire form.
  */
 final class PropertyValueNormalizer
 {
     /**
-     * 规范化单个属性值。
+     * Normalize a single property value.
      */
     public static function normalize(mixed $value): mixed
     {

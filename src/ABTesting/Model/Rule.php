@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\ABTesting\Model;
 
 /**
- * A/B 规则定义。
+ * A/B rule definition.
  */
 final class Rule
 {
@@ -23,7 +23,7 @@ final class Rule
     }
 
     /**
-     * 从数组创建规则对象。
+     * Build a rule from a decoded payload array.
      *
      * @param array<string, mixed> $data
      */
@@ -52,7 +52,7 @@ final class Rule
     }
 
     /**
-     * 导出为数组。
+     * Export as an associative array.
      *
      * @return array<string, mixed>
      */

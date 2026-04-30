@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\Support;
 
 /**
- * SDK 基础元信息。
+ * SDK identity metadata.
  */
 final class SDKInfo
 {

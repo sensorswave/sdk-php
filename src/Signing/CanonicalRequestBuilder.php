@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace SensorsWave\Signing;
 
 /**
- * Canonical request 构造器。
+ * Builds the canonical request string used for signing.
  */
 final class CanonicalRequestBuilder
 {
     /**
-     * 构造 canonical request 字符串。
+     * Build the canonical request string.
      *
      * @param array<string, string> $headers
      */
@@ -41,7 +41,7 @@ final class CanonicalRequestBuilder
     }
 
     /**
-     * 返回排序后的 header 名称。
+     * Return header names sorted in ascending order.
      *
      * @param array<string, string> $headers
      *

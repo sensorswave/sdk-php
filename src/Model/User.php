@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\Model;
 
 /**
- * 统一用户标识。
+ * Unified user identity.
  */
 final class User
 {
@@ -24,7 +24,7 @@ final class User
     }
 
     /**
-     * 返回匿名 ID。
+     * Return the anonymous ID.
      */
     public function anonId(): string
     {
@@ -32,7 +32,7 @@ final class User
     }
 
     /**
-     * 返回登录 ID。
+     * Return the login ID.
      */
     public function loginId(): string
     {
@@ -40,7 +40,7 @@ final class User
     }
 
     /**
-     * 返回 A/B 用户属性。
+     * Return the A/B user properties.
      */
     public function abUserProperties(): Properties
     {
@@ -48,7 +48,7 @@ final class User
     }
 
     /**
-     * 返回添加了单个 A/B 属性的新用户对象。
+     * Return a copy with the given A/B user property added.
      */
     public function withAbUserProperty(string $key, mixed $value): self
     {
@@ -59,7 +59,7 @@ final class User
     }
 
     /**
-     * 返回添加了多个 A/B 属性的新用户对象。
+     * Return a copy with the given A/B user properties merged in.
      */
     public function withAbUserProperties(array|Properties $properties): self
     {

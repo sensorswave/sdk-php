@@ -23,7 +23,7 @@ use SensorsWave\Tracking\Predefined;
 use SensorsWave\Tracking\UserPropertyEventFactory;
 
 /**
- * PHP 风格的 SDK 客户端。
+ * PHP-style SDK client.
  */
 final class Client
 {
@@ -53,7 +53,7 @@ final class Client
     }
 
     /**
-     * 创建客户端实例。
+     * Create a new client instance.
      */
     public static function create(string $endpoint, string $sourceToken, ?Config $config = null): self
     {
@@ -61,7 +61,7 @@ final class Client
     }
 
     /**
-     * 关闭客户端。
+     * Close the client.
      */
     public function close(): void
     {
@@ -74,7 +74,7 @@ final class Client
     }
 
     /**
-     * 立即刷出当前缓冲中的埋点事件。
+     * Flush buffered tracking events immediately.
      */
     public function flush(): void
     {
@@ -86,7 +86,7 @@ final class Client
     }
 
     /**
-     * 发送 Identify 事件。
+     * Send an Identify event.
      */
     public function identify(User $user): void
     {
@@ -98,7 +98,7 @@ final class Client
     }
 
     /**
-     * 发送自定义事件。
+     * Send a custom tracking event.
      *
      * Complex property input conventions (server-side limits; the SDK
      * does not validate, exceeding any of these may be silently
@@ -122,7 +122,7 @@ final class Client
     }
 
     /**
-     * 直接发送完整事件对象。
+     * Send a fully-built event.
      *
      * The Event's properties and user_properties are subject to the same
      * conventions as trackEvent (see trackEvent doc for details).
@@ -139,7 +139,8 @@ final class Client
     }
 
     /**
-     * 发送 profile set 事件。Object 与 Object Array 值会原样传递给服务端。
+     * Send a profile set event. Object and Object Array values are
+     * forwarded to the server as-is.
      *
      * Complex property input conventions (server-side limits; the SDK
      * does not validate):
@@ -156,7 +157,8 @@ final class Client
     }
 
     /**
-     * 发送 profile set once 事件。Object 与 Object Array 值会原样传递给服务端。
+     * Send a profile set-once event. Object and Object Array values are
+     * forwarded to the server as-is.
      *
      * Complex property input conventions (server-side limits; the SDK
      * does not validate):
@@ -180,7 +182,7 @@ final class Client
     }
 
     /**
-     * 发送 profile increment 事件。
+     * Send a profile increment event.
      */
     public function profileIncrement(User $user, array|Properties $properties): void
     {
@@ -196,11 +198,12 @@ final class Client
     }
 
     /**
-     * 发送 profile append 事件。值必须是仅含标量元素的列表。
+     * Send a profile append event. Each value must be a list of scalars.
      *
-     * Object（关联数组）与 Object Array（关联数组组成的索引数组）值**不被
-     * 接受**。SDK 不会拒绝，但服务端会推断为 OBJECT_ARRAY，与列表语义不符。
-     * 请仅传入标量。
+     * Object (associative array) and Object Array (indexed array of
+     * associative arrays) values are **not accepted**: the SDK does not
+     * reject them, but the server will infer them as OBJECT_ARRAY, which
+     * contradicts list semantics. Only pass scalar lists.
      *
      * Complex property input conventions (server-side limits; the SDK
      * does not validate):
@@ -220,11 +223,13 @@ final class Client
     }
 
     /**
-     * 发送 profile union 事件。值必须是仅含标量元素的列表（自动去重）。
+     * Send a profile union event. Each value must be a list of scalars
+     * (auto-deduplicated).
      *
-     * Object（关联数组）与 Object Array（关联数组组成的索引数组）值**不被
-     * 接受**。SDK 不会拒绝，但服务端会推断为 OBJECT_ARRAY，与列表语义不符。
-     * 请仅传入标量。
+     * Object (associative array) and Object Array (indexed array of
+     * associative arrays) values are **not accepted**: the SDK does not
+     * reject them, but the server will infer them as OBJECT_ARRAY, which
+     * contradicts list semantics. Only pass scalar lists.
      *
      * Complex property input conventions (server-side limits; the SDK
      * does not validate):
@@ -244,7 +249,7 @@ final class Client
     }
 
     /**
-     * 发送 profile unset 事件。
+     * Send a profile unset event.
      */
     public function profileUnset(User $user, string ...$propertyKeys): void
     {
@@ -257,7 +262,7 @@ final class Client
     }
 
     /**
-     * 发送 profile delete 事件。
+     * Send a profile delete event.
      */
     public function profileDelete(User $user): void
     {
@@ -272,7 +277,7 @@ final class Client
     }
 
     /**
-     * 执行 gate 求值。
+     * Evaluate a feature gate.
      */
     public function checkFeatureGate(User $user, string $key): bool
     {
@@ -289,7 +294,7 @@ final class Client
     }
 
     /**
-     * 获取 feature config。
+     * Fetch a feature config.
      */
     public function getFeatureConfig(User $user, string $key): ABResult
     {
@@ -306,7 +311,7 @@ final class Client
     }
 
     /**
-     * 获取 experiment 结果。
+     * Fetch the experiment result.
      */
     public function getExperiment(User $user, string $key): ABResult
     {
@@ -323,7 +328,7 @@ final class Client
     }
 
     /**
-     * 批量获取当前 metadata 中的全部 A/B 结果。
+     * Evaluate every spec in the current metadata snapshot.
      *
      * @return list<ABResult>
      */
@@ -344,7 +349,7 @@ final class Client
     }
 
     /**
-     * 导出当前 A/B metadata 快照。
+     * Export the current A/B metadata snapshot.
      */
     public function getABSpecs(): string
     {

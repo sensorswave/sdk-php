@@ -7,11 +7,12 @@ namespace SensorsWave\Contract;
 use SensorsWave\Storage\QueueMessage;
 
 /**
- * 事件队列抽象。
+ * Event queue abstraction.
  *
- * 注意：当前 ack/nack 的粒度是 receipt 级别（即同一次 dequeue 返回的所有消息共享
- * 同一个 receipt）。调用方必须整批 ack 或整批 nack，不支持对同一 receipt 下的消息
- * 做部分确认——部分 ack 会导致同批剩余消息一起被确认，部分 nack 会导致整批被重投。
+ * Note: ack/nack granularity is receipt-level — every message returned by the
+ * same dequeue() call shares one receipt and must be acked or nacked as a
+ * single batch. Partial ack will silently confirm the rest of the batch;
+ * partial nack will requeue the entire batch.
  */
 interface EventQueueInterface
 {
@@ -22,14 +23,16 @@ interface EventQueueInterface
     public function dequeue(int $limit): array;
 
     /**
-     * 确认消息已成功处理。同一 receipt 下的消息必须整批确认。
+     * Acknowledge that the messages were processed successfully. Messages
+     * sharing one receipt must be acked together.
      *
      * @param list<QueueMessage> $messages
      */
     public function ack(array $messages): void;
 
     /**
-     * 将消息退回队列以便重新投递。同一 receipt 下的消息必须整批退回。
+     * Requeue the messages for redelivery. Messages sharing one receipt must
+     * be nacked together.
      *
      * @param list<QueueMessage> $messages
      */

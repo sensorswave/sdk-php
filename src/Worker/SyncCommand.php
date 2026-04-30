@@ -12,7 +12,7 @@ use SensorsWave\Http\TransportInterface;
 use RuntimeException;
 
 /**
- * 远程 metadata 同步任务。
+ * Worker that syncs remote metadata into the local store.
  */
 final class SyncCommand
 {

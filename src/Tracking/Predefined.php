@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SensorsWave\Tracking;
 
 /**
- * 跟踪事件与属性常量。
+ * Predefined event names and property keys.
  */
 final class Predefined
 {

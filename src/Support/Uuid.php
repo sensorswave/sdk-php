@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace SensorsWave\Support;
 
 /**
- * UUID 生成工具。
+ * UUID helpers.
  */
 final class Uuid
 {
     /**
-     * 生成一个 RFC 4122 v4 UUID。
+     * Generate an RFC 4122 v4 UUID.
      */
     public static function v4(): string
     {
