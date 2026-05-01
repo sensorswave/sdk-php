@@ -55,6 +55,35 @@ final class GateEvaluationTest extends TestCase
         self::assertTrue($correct->checkFeatureGate());
     }
 
+    public function testGateAnyOfInsensitiveProps(): void
+    {
+        $core = new ABCore(FixtureLoader::loadStorageFromJson(
+            dirname(__DIR__) . '/testdata/gate/anyof_insensitive.json'
+        ));
+
+        $missing = $core->evaluate(new User('', 'user-pass'), 'TestSpec', ABCore::TYPE_GATE);
+        $wrong = $core->evaluate(
+            new User('', 'user-pass', Properties::create()->set('$browser_name', 'Safari')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        );
+        $caseMismatch = $core->evaluate(
+            new User('', 'user-pass', Properties::create()->set('$browser_name', 'chrome')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        );
+        $exactMatch = $core->evaluate(
+            new User('', 'user-pass', Properties::create()->set('$browser_name', 'Chrome')),
+            'TestSpec',
+            ABCore::TYPE_GATE
+        );
+
+        self::assertFalse($missing->checkFeatureGate());
+        self::assertFalse($wrong->checkFeatureGate());
+        self::assertTrue($caseMismatch->checkFeatureGate());
+        self::assertTrue($exactMatch->checkFeatureGate());
+    }
+
     public function testGateNoneOfInsensitiveProps(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
