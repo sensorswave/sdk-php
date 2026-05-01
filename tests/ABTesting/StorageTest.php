@@ -14,7 +14,7 @@ final class StorageTest extends TestCase
     public function testFixtureLoaderParsesStorageSnapshot(): void
     {
         $storage = FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/public.json'
+            dirname(__DIR__) . '/testdata/config/public.json'
         );
 
         self::assertSame(1764658761824, $storage->updateTime);

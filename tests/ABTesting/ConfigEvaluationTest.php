@@ -16,7 +16,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigPublicFirstMatchWinsOnlyFirstRuleApplies(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/public.json'
+            dirname(__DIR__) . '/testdata/config/public.json'
         ));
 
         // First-match-wins: all users match rule 1 (IS_TRUE), only ~10% pass rollout → v1.
@@ -48,7 +48,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigOverrideHonorsExplicitUserRule(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/override.json'
+            dirname(__DIR__) . '/testdata/config/override.json'
         ));
 
         $result = $core->evaluate(new User('', 'login-id-example-1'), 'bMHsfOAUKx', ABCore::TYPE_CONFIG);
@@ -60,7 +60,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigHoldoutCanReturnHoldoutVariant(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/holdout.json'
+            dirname(__DIR__) . '/testdata/config/holdout.json'
         ));
 
         $holdoutUser = null;
@@ -79,7 +79,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigHoldoutRateStaysNearExpectedRange(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/holdout.json'
+            dirname(__DIR__) . '/testdata/config/holdout.json'
         ));
 
         // Traffic rule: rollout 90 → ~10% holdout.
@@ -118,7 +118,7 @@ final class ConfigEvaluationTest extends TestCase
         $handler->data['27-sticky-config-cache'] = json_encode(['v' => 'v1'], JSON_THROW_ON_ERROR);
 
         $core = new ABCore(
-            FixtureLoader::loadStorageFromJson(dirname(__DIR__) . '/Fixtures/ab/config/sticky.json'),
+            FixtureLoader::loadStorageFromJson(dirname(__DIR__) . '/testdata/config/sticky.json'),
             $handler
         );
 
@@ -143,7 +143,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigTargetBlocksLowVersionAndAllowsQualifiedUsers(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/target.json'
+            dirname(__DIR__) . '/testdata/config/target.json'
         ));
 
         $blocked = $core->evaluate(
@@ -173,7 +173,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigFirstMatchWinsVipGetsV1(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/config/first_match_wins.json'
         ));
 
         $result = $core->evaluate(new User('', 'vip-user-1'), 'config_first_match', ABCore::TYPE_CONFIG);
@@ -185,7 +185,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigFirstMatchWinsVipAlsoMemberStillGetsV1(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/config/first_match_wins.json'
         ));
 
         // VIP user who is also a member → first rule matches → v1 (not v2)
@@ -202,7 +202,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigFirstMatchWinsMemberGetsV2(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/config/first_match_wins.json'
         ));
 
         $result = $core->evaluate(
@@ -218,7 +218,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigFirstMatchWinsPublicUserGetsV3(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/config/first_match_wins.json'
         ));
 
         $result = $core->evaluate(new User('', 'anonymous-user'), 'config_first_match', ABCore::TYPE_CONFIG);
@@ -230,7 +230,7 @@ final class ConfigEvaluationTest extends TestCase
     public function testConfigFirstMatchWinsNonMemberFallsToPublic(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/config/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/config/first_match_wins.json'
         ));
 
         // is_member=false → second rule doesn't match → fallback to public rule

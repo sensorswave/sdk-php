@@ -23,8 +23,6 @@ use PHPUnit\Framework\TestCase;
  */
 abstract class ConformanceTestCase extends TestCase
 {
-    private const DEFAULT_TESTDATA_DIR = 'testdata/conformance';
-
     /**
      * 返回 capability ID（如 "tracking-core"）。
      */
@@ -36,11 +34,14 @@ abstract class ConformanceTestCase extends TestCase
     abstract protected function createAdapter(): CaseAdapter;
 
     /**
-     * 返回 testdata 目录路径。子类可覆盖。
+     * 返回 testdata 目录路径。
+     *
+     * 默认解析 HarnessPaths::conformanceRoot()（即 backend-sdk-harness 的
+     * conformance/ 目录），子类如需指向其他位置可覆盖。
      */
     protected function testdataDir(): string
     {
-        return self::DEFAULT_TESTDATA_DIR;
+        return HarnessPaths::conformanceRoot();
     }
 
     /**

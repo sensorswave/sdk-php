@@ -25,7 +25,7 @@ final class ClientABTest extends TestCase
                 eventQueue: $queue,
                 ab: new ABConfig(
                     abSpecStore: new MemoryABSpecStore(),
-                    loadABSpecs: file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: ''
+                    loadABSpecs: file_get_contents(dirname(__DIR__) . '/testdata/gate/public.json') ?: ''
                 )
             )
         );
@@ -48,7 +48,7 @@ final class ClientABTest extends TestCase
                 eventQueue: $queue,
                 ab: new ABConfig(
                     abSpecStore: new MemoryABSpecStore(),
-                    loadABSpecs: file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/multi_gates.json') ?: ''
+                    loadABSpecs: file_get_contents(dirname(__DIR__) . '/testdata/gate/multi_gates.json') ?: ''
                 )
             )
         );
@@ -71,7 +71,7 @@ final class ClientABTest extends TestCase
 
     public function testClientEvaluatesFromLocalStoreWithoutRemoteRequests(): void
     {
-        $snapshot = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
+        $snapshot = file_get_contents(dirname(__DIR__) . '/testdata/gate/public.json') ?: '';
         $store = new MemoryABSpecStore($snapshot);
         $transport = new FakeTransport();
         $client = Client::create(
@@ -111,7 +111,7 @@ final class ClientABTest extends TestCase
 
     public function testClientUsesSnapshotRegardlessOfAge(): void
     {
-        $snapshot = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
+        $snapshot = file_get_contents(dirname(__DIR__) . '/testdata/gate/public.json') ?: '';
         $store = new MemoryABSpecStore($snapshot);
         $client = Client::create(
             'https://collector.example.com',
@@ -129,7 +129,7 @@ final class ClientABTest extends TestCase
 
     public function testClientCanExportABSpecsSnapshotFromStore(): void
     {
-        $snapshot = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
+        $snapshot = file_get_contents(dirname(__DIR__) . '/testdata/gate/public.json') ?: '';
         $store = new MemoryABSpecStore($snapshot);
         $client = Client::create(
             'https://collector.example.com',
@@ -171,7 +171,7 @@ final class ClientABTest extends TestCase
                 eventQueue: $queue,
                 ab: new ABConfig(
                     abSpecStore: new MemoryABSpecStore(),
-                    loadABSpecs: file_get_contents(dirname(__DIR__) . '/Fixtures/ab/exp/public.json') ?: ''
+                    loadABSpecs: file_get_contents(dirname(__DIR__) . '/testdata/exp/public.json') ?: ''
                 )
             )
         );

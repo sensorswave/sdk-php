@@ -16,7 +16,7 @@ final class ExperimentEvaluationTest extends TestCase
     public function testExperimentPublicAssignsVariantAndPayload(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/public.json'
+            dirname(__DIR__) . '/testdata/exp/public.json'
         ));
 
         $variantOneUser = null;
@@ -55,7 +55,7 @@ final class ExperimentEvaluationTest extends TestCase
         $handler->data['26-sticky-user-cache'] = json_encode(['v' => 'v2'], JSON_THROW_ON_ERROR);
 
         $core = new ABCore(
-            FixtureLoader::loadStorageFromJson(dirname(__DIR__) . '/Fixtures/ab/exp/sticky.json'),
+            FixtureLoader::loadStorageFromJson(dirname(__DIR__) . '/testdata/exp/sticky.json'),
             $handler
         );
 
@@ -79,7 +79,7 @@ final class ExperimentEvaluationTest extends TestCase
     public function testExperimentHoldoutCanReturnHoldoutVariant(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/holdout.json'
+            dirname(__DIR__) . '/testdata/exp/holdout.json'
         ));
 
         $holdoutUser = null;
@@ -98,10 +98,10 @@ final class ExperimentEvaluationTest extends TestCase
     public function testExperimentGateDependencyPassAndFail(): void
     {
         $passCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/gate_target_pass.json'
+            dirname(__DIR__) . '/testdata/exp/gate_target_pass.json'
         ));
         $failCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/gate_target_fail.json'
+            dirname(__DIR__) . '/testdata/exp/gate_target_fail.json'
         ));
 
         $blocked = $passCore->evaluate(
@@ -137,10 +137,10 @@ final class ExperimentEvaluationTest extends TestCase
     public function testExperimentLayerAndLayerHoldout(): void
     {
         $layerCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/layer.json'
+            dirname(__DIR__) . '/testdata/exp/layer.json'
         ));
         $layerHoldoutCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/layer_with_holdout.json'
+            dirname(__DIR__) . '/testdata/exp/layer_with_holdout.json'
         ));
 
         $variantOne = null;
@@ -179,7 +179,7 @@ final class ExperimentEvaluationTest extends TestCase
     public function testExperimentHoldoutRateAndVariantsStayInExpectedRange(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/holdout.json'
+            dirname(__DIR__) . '/testdata/exp/holdout.json'
         ));
 
         $totalUsers = 1000;
@@ -207,7 +207,7 @@ final class ExperimentEvaluationTest extends TestCase
     public function testExperimentLayerWithHoldoutRateStaysNearExpectedRange(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/layer_with_holdout.json'
+            dirname(__DIR__) . '/testdata/exp/layer_with_holdout.json'
         ));
 
         $totalUsers = 1000;
@@ -235,7 +235,7 @@ final class ExperimentEvaluationTest extends TestCase
     public function testExperimentTrafficRolloutCanExcludeUsers(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/public.json'
+            dirname(__DIR__) . '/testdata/exp/public.json'
         ));
 
         $inTraffic = null;
@@ -260,7 +260,7 @@ final class ExperimentEvaluationTest extends TestCase
     public function testExperimentTargetRequiresMatchingVersion(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/target.json'
+            dirname(__DIR__) . '/testdata/exp/target.json'
         ));
 
         $blocked = $core->evaluate(
@@ -291,7 +291,7 @@ final class ExperimentEvaluationTest extends TestCase
     public function testExperimentReleaseOverridesAllUsersToVariantTwo(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/exp/release.json'
+            dirname(__DIR__) . '/testdata/exp/release.json'
         ));
 
         foreach (['user1', 'user2', 'alice', 'bob'] as $loginId) {

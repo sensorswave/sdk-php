@@ -19,9 +19,9 @@ class ConformanceRunner
 {
     private string $testdataDir;
 
-    public function __construct(string $testdataDir = 'testdata/conformance')
+    public function __construct(?string $testdataDir = null)
     {
-        $this->testdataDir = $testdataDir;
+        $this->testdataDir = $testdataDir ?? HarnessPaths::conformanceRoot();
     }
 
     /**

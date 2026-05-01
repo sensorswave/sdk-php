@@ -22,7 +22,7 @@ final class GateEvaluationTest extends TestCase
     public function testGatePublicRollout(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/public.json'
+            dirname(__DIR__) . '/testdata/gate/public.json'
         ));
 
         $pass = $core->evaluate(new User('', 'user-pass'), 'TestSpec', ABCore::TYPE_GATE);
@@ -35,7 +35,7 @@ final class GateEvaluationTest extends TestCase
     public function testGateAnyOfSensitiveProps(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/anyof_sensitive.json'
+            dirname(__DIR__) . '/testdata/gate/anyof_sensitive.json'
         ));
 
         $missing = $core->evaluate(new User('', 'user-pass'), 'TestSpec', ABCore::TYPE_GATE);
@@ -58,7 +58,7 @@ final class GateEvaluationTest extends TestCase
     public function testGateNoneOfInsensitiveProps(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/noneof_insentive.json'
+            dirname(__DIR__) . '/testdata/gate/noneof_insentive.json'
         ));
 
         $blocked = $core->evaluate(
@@ -79,10 +79,10 @@ final class GateEvaluationTest extends TestCase
     public function testGateIsNullAndIsNotNull(): void
     {
         $isNullCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/isnull.json'
+            dirname(__DIR__) . '/testdata/gate/isnull.json'
         ));
         $isNotNullCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/isnotnull.json'
+            dirname(__DIR__) . '/testdata/gate/isnotnull.json'
         ));
 
         $nullResult = $isNullCore->evaluate(new User('', 'user-pass'), 'TestSpec', ABCore::TYPE_GATE);
@@ -110,10 +110,10 @@ final class GateEvaluationTest extends TestCase
     public function testDisabledAndMissingKeyReturnFalse(): void
     {
         $disabledCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/disable.json'
+            dirname(__DIR__) . '/testdata/gate/disable.json'
         ));
         $publicCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/public.json'
+            dirname(__DIR__) . '/testdata/gate/public.json'
         ));
 
         $disabled = $disabledCore->evaluate(new User('', 'user-pass'), 'TestSpec', ABCore::TYPE_GATE);
@@ -126,25 +126,25 @@ final class GateEvaluationTest extends TestCase
     public function testGateNumberBooleanAndEqualityOperators(): void
     {
         $gteCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/gte_number.json'
+            dirname(__DIR__) . '/testdata/gate/gte_number.json'
         ));
         $ltCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/lt_number.json'
+            dirname(__DIR__) . '/testdata/gate/lt_number.json'
         ));
         $lteCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/lte_number.json'
+            dirname(__DIR__) . '/testdata/gate/lte_number.json'
         ));
         $trueCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/is_true.json'
+            dirname(__DIR__) . '/testdata/gate/is_true.json'
         ));
         $falseCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/is_false.json'
+            dirname(__DIR__) . '/testdata/gate/is_false.json'
         ));
         $eqCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/eq.json'
+            dirname(__DIR__) . '/testdata/gate/eq.json'
         ));
         $neqCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/neq_number.json'
+            dirname(__DIR__) . '/testdata/gate/neq_number.json'
         ));
 
         self::assertTrue($gteCore->evaluate(
@@ -187,10 +187,10 @@ final class GateEvaluationTest extends TestCase
     public function testGateVersionNeqAndEmptyRulesFallbackToFalse(): void
     {
         $versionNeqCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/not_equal.json'
+            dirname(__DIR__) . '/testdata/gate/not_equal.json'
         ));
         $emptyRulesCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/missing_gate_rules.json'
+            dirname(__DIR__) . '/testdata/gate/missing_gate_rules.json'
         ));
 
         self::assertFalse($versionNeqCore->evaluate(
@@ -213,25 +213,25 @@ final class GateEvaluationTest extends TestCase
     public function testGateVersionAndTimeOperators(): void
     {
         $gtVersion = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/greater_version.json'
+            dirname(__DIR__) . '/testdata/gate/greater_version.json'
         ));
         $gteVersion = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/greater_equal_version.json'
+            dirname(__DIR__) . '/testdata/gate/greater_equal_version.json'
         ));
         $ltVersion = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/less_version.json'
+            dirname(__DIR__) . '/testdata/gate/less_version.json'
         ));
         $lteVersion = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/less_equal_version.json'
+            dirname(__DIR__) . '/testdata/gate/less_equal_version.json'
         ));
         $eqVersion = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/equal_version.json'
+            dirname(__DIR__) . '/testdata/gate/equal_version.json'
         ));
         $beforeCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/before.json'
+            dirname(__DIR__) . '/testdata/gate/before.json'
         ));
         $afterCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/after.json'
+            dirname(__DIR__) . '/testdata/gate/after.json'
         ));
 
         self::assertTrue($gtVersion->evaluate(
@@ -280,16 +280,16 @@ final class GateEvaluationTest extends TestCase
     public function testGateCustomFieldOverrideAndAnonIdSubject(): void
     {
         $customCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/custom_field.json'
+            dirname(__DIR__) . '/testdata/gate/custom_field.json'
         ));
         $overrideIdCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/override_id.json'
+            dirname(__DIR__) . '/testdata/gate/override_id.json'
         ));
         $overrideConditionCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/override_condition.json'
+            dirname(__DIR__) . '/testdata/gate/override_condition.json'
         ));
         $anonCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/anon_id.json'
+            dirname(__DIR__) . '/testdata/gate/anon_id.json'
         ));
 
         self::assertTrue($customCore->evaluate(
@@ -331,7 +331,7 @@ final class GateEvaluationTest extends TestCase
     public function testEvaluateAllReturnsAllGateResultsIncludingFailures(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/multi_gates.json'
+            dirname(__DIR__) . '/testdata/gate/multi_gates.json'
         ));
 
         $results = $core->evaluateAll(new User(
@@ -361,7 +361,7 @@ final class GateEvaluationTest extends TestCase
     public function testEvaluateAllMultipleUsersPreservesPassFailCombinations(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/multi_gates.json'
+            dirname(__DIR__) . '/testdata/gate/multi_gates.json'
         ));
 
         $testCases = [
@@ -408,10 +408,10 @@ final class GateEvaluationTest extends TestCase
     public function testGateNoneOfSensitivePropsAndReleaseGate(): void
     {
         $noneOfSensitiveCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/noneof_sensitive.json'
+            dirname(__DIR__) . '/testdata/gate/noneof_sensitive.json'
         ));
         $releaseCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/release.json'
+            dirname(__DIR__) . '/testdata/gate/release.json'
         ));
 
         self::assertTrue($noneOfSensitiveCore->evaluate(
@@ -448,7 +448,7 @@ final class GateEvaluationTest extends TestCase
         $handler->data['25-user-cache'] = json_encode(['v' => 'pass'], JSON_THROW_ON_ERROR);
 
         $core = new ABCore(
-            FixtureLoader::loadStorageFromJson(dirname(__DIR__) . '/Fixtures/ab/gate/sticky.json'),
+            FixtureLoader::loadStorageFromJson(dirname(__DIR__) . '/testdata/gate/sticky.json'),
             $handler
         );
 
@@ -471,10 +471,10 @@ final class GateEvaluationTest extends TestCase
     public function testGateHoldoutAndDependentGateFail(): void
     {
         $holdoutCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/holdout.json'
+            dirname(__DIR__) . '/testdata/gate/holdout.json'
         ));
         $gateFailCore = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/gate_fail.json'
+            dirname(__DIR__) . '/testdata/gate/gate_fail.json'
         ));
 
         self::assertFalse($holdoutCore->evaluate(
@@ -503,7 +503,7 @@ final class GateEvaluationTest extends TestCase
     public function testGateComplicateRuleChain(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/complicate.json'
+            dirname(__DIR__) . '/testdata/gate/complicate.json'
         ));
 
         self::assertTrue($core->evaluate(
@@ -595,7 +595,7 @@ final class GateEvaluationTest extends TestCase
         };
 
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/sticky.json'
+            dirname(__DIR__) . '/testdata/gate/sticky.json'
         ), $handler);
 
         $this->expectException(RuntimeException::class);
@@ -692,7 +692,7 @@ final class GateEvaluationTest extends TestCase
     public function testGateFirstMatchWinsVipPassesViaFirstRule(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/gate/first_match_wins.json'
         ));
 
         $result = $core->evaluate(new User('', 'vip-user-1'), 'gate_first_match', ABCore::TYPE_GATE);
@@ -704,7 +704,7 @@ final class GateEvaluationTest extends TestCase
     public function testGateFirstMatchWinsVipPlusMemberStillMatchesFirst(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/gate/first_match_wins.json'
         ));
 
         $result = $core->evaluate(
@@ -720,7 +720,7 @@ final class GateEvaluationTest extends TestCase
     public function testGateFirstMatchWinsMemberPassesViaSecondRule(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/gate/first_match_wins.json'
         ));
 
         $result = $core->evaluate(
@@ -736,7 +736,7 @@ final class GateEvaluationTest extends TestCase
     public function testGateFirstMatchWinsPlainUserMatchesThirdRuleZeroRolloutFails(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/gate/first_match_wins.json'
         ));
 
         // Rule 1 (VIP): not in list → skip. Rule 2 (Member): not set → skip.
@@ -750,7 +750,7 @@ final class GateEvaluationTest extends TestCase
     public function testGateFirstMatchWinsNonMemberMatchesThirdRuleZeroRolloutFails(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/first_match_wins.json'
+            dirname(__DIR__) . '/testdata/gate/first_match_wins.json'
         ));
 
         // is_member=false → Rule 2 skipped → Rule 3 matches → rollout=0 → fail
@@ -770,7 +770,7 @@ final class GateEvaluationTest extends TestCase
     public function testGateCircularDependencyReturnsFalseWithoutStackOverflow(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
-            dirname(__DIR__) . '/Fixtures/ab/gate/gate_circular.json'
+            dirname(__DIR__) . '/testdata/gate/gate_circular.json'
         ));
 
         $resultA = $core->evaluate(new User('', 'user-1'), 'Gate_A', ABCore::TYPE_GATE);

@@ -16,7 +16,7 @@ final class SyncCommandTest extends TestCase
 {
     public function testSyncCommandFetchesRemoteSnapshotAndSavesIt(): void
     {
-        $snapshot = file_get_contents(dirname(__DIR__) . '/Fixtures/ab/gate/public.json') ?: '';
+        $snapshot = file_get_contents(dirname(__DIR__) . '/testdata/gate/public.json') ?: '';
         $store = new MemoryABSpecStore();
         $transport = new class ($snapshot) implements TransportInterface {
             /** @var list<Request> */
