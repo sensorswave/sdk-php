@@ -97,6 +97,20 @@ final class ABCoreEvaluationConformanceTest extends TestCase
             (string) ($userData['login_id'] ?? ''),
             (array) ($userData['ab_user_props'] ?? []),
         );
+
+        // expected_error 模式：fixture 标本 case 应抛错；只验"有异常"，与
+        // conformance/runners/php/ab_core_evaluation.py 的 result_comparator 对齐。
+        if (!empty($case['expected_error'])) {
+            $thrown = false;
+            try {
+                $core->evaluate($user, (string) $case['key'], $evalType);
+            } catch (\Throwable $e) {
+                $thrown = true;
+            }
+            self::assertTrue($thrown, 'expected error from evaluate');
+            return;
+        }
+
         $result = $core->evaluate($user, (string) $case['key'], $evalType);
 
         $actual = [
