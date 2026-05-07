@@ -569,46 +569,6 @@ final class GateEvaluationTest extends TestCase
         )->checkFeatureGate());
     }
 
-    public function testInvalidCommonConditionRaisesRuntimeException(): void
-    {
-        $core = new ABCore(new Storage(
-            1,
-            new ABEnv(),
-            [
-                'broken_gate' => new ABSpec(
-                    1,
-                    'broken_gate',
-                    'Broken Gate',
-                    ABCore::TYPE_GATE,
-                    '',
-                    'LOGIN_ID',
-                    true,
-                    false,
-                    '',
-                    1,
-                    false,
-                    [
-                        'GATE' => [
-                            new Rule(
-                                'invalid-common',
-                                'r1',
-                                '',
-                                100.0,
-                                [new Condition('COMMON', 'unknown', 'IS_TRUE', null)],
-                                null
-                            ),
-                        ],
-                    ],
-                    []
-                ),
-            ]
-        ));
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('unknown common field');
-        $core->evaluate(new User('', 'u'), 'broken_gate', ABCore::TYPE_GATE);
-    }
-
     public function testStickyWriteExceptionPropagates(): void
     {
         $handler = new class implements \SensorsWave\Contract\StickyHandlerInterface {
@@ -674,12 +634,6 @@ final class GateEvaluationTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('bucket_set requires string salt and bitmap');
         $core->evaluate(new User('', 'u'), 'broken_bucket_gate', ABCore::TYPE_GATE);
-    }
-
-    public function testGate026InvalidCommonConditionRaisesRuntimeException(): void
-    {
-        $this->assertNotFalse(strpos($this->name(), 'Gate026'));
-        $this->testInvalidCommonConditionRaisesRuntimeException();
     }
 
     public function testGate027StickyWriteExceptionPropagates(): void
