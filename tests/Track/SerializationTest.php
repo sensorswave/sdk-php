@@ -5,43 +5,29 @@ declare(strict_types=1);
 namespace SensorsWave\Tests\Track;
 
 use DateTimeImmutable;
-use DateTimeZone;
 use PHPUnit\Framework\TestCase;
 use SensorsWave\Model\Event;
 use SensorsWave\Model\Properties;
 use SensorsWave\Model\User;
 use SensorsWave\Tracking\EventSerializer;
-use SensorsWave\Tracking\Predefined;
 use SensorsWave\Tracking\UserPropertyEventFactory;
 
+/**
+ * SerializationTest — 保留以下两类：
+ *   - track-005（unit_test 类）：JSON 序列化往返关键字段保留。
+ *   - property-datetime-iso8601-utc capability 范围的时间归一化测试（不属 tracking-core）。
+ *
+ * tracking-core 的 A 类方法（identify / basic-track-event / profile-set 默认属性等）
+ * 已迁移到 tests/Conformance/TrackingCoreConformanceTest（完全派生模式）。
+ * 详见 docs/specs/testing-strategy.md 与 testing-derivation-pilot.md。
+ */
 final class SerializationTest extends TestCase
 {
-    public function testIdentifyEventKeepsExpectedEventName(): void
-    {
-        $event = Event::create('anon-123', 'user-456', Predefined::EVENT_IDENTIFY);
-
-        $event->normalize();
-
-        self::assertSame('$Identify', $event->event());
-    }
-
-    public function testProfileSetEventContainsDefaultPropertiesAndPayload(): void
-    {
-        $event = UserPropertyEventFactory::profileSet(
-            new User('anon-123', 'user-456'),
-            Properties::create()->set('plan', 'pro')
-        );
-
-        $event->normalize();
-
-        self::assertSame('$UserSet', $event->event());
-        self::assertSame('user_set', $event->properties()->get('$user_set_type'));
-        self::assertSame('pro', $event->userProperties()->group('$set')['plan']);
-        self::assertSame('php', $event->properties()->get('$lib'));
-        self::assertSame(\SensorsWave\Support\SDKInfo::VERSION, $event->properties()->get('$lib_version'));
-    }
-
-    public function testEventSerializerProducesExpectedJsonShape(): void
+    /**
+     * track-005 — JSON 序列化往返：事件经 EventSerializer::serialize 后属性完整保留。
+     * source: track_test.go#TestEventJSONSerialization（命名变体匹配此方法）
+     */
+    public function testTrack005EventSerializerProducesExpectedJsonShape(): void
     {
         $event = Event::create('anon-123', 'user-456', 'TestEvent')
             ->withProperties(Properties::create()->set('test_key', 'test_value'));
@@ -56,13 +42,6 @@ final class SerializationTest extends TestCase
         self::assertSame('php', $decoded['properties']['$lib']);
         self::assertSame(\SensorsWave\Support\SDKInfo::VERSION, $decoded['properties']['$lib_version']);
         self::assertSame('test_value', $decoded['properties']['test_key']);
-    }
-
-    public function testTrack005EventSerializerProducesExpectedJsonShape(): void
-    {
-        // test_value TestEvent
-        $this->assertNotFalse(strpos($this->name(), 'Track005'));
-        $this->testEventSerializerProducesExpectedJsonShape();
     }
 
     public function testEventSerializerUsesIso8601UtcFormatForNativePropertyDateTime(): void

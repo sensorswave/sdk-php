@@ -150,27 +150,6 @@ final class ClientTrackingTest extends TestCase
         self::assertSame('queue down', $failedError?->getMessage());
     }
 
-    public function testCloseFlushesBufferedEventsInSingleBatch(): void
-    {
-        $queue = new MemoryEventQueue();
-        $transport = new FakeTransport();
-        $client = Client::create(
-            'https://collector.example.com',
-            'test-token',
-            new Config(transport: $transport, eventQueue: $queue)
-        );
-
-        $client->trackEvent(new User('anon-1', 'user-1'), 'BufferedOne', ['step' => 1]);
-        $client->trackEvent(new User('anon-2', 'user-2'), 'BufferedTwo', ['step' => 2]);
-        $client->close();
-
-        self::assertCount(0, $transport->requests);
-        $messages = $queue->dequeue(50);
-        self::assertCount(2, $messages);
-        self::assertSame('BufferedOne', json_decode($messages[0]->payload, true)['event']);
-        self::assertSame('BufferedTwo', json_decode($messages[1]->payload, true)['event']);
-    }
-
     public function testFlushWritesBufferedEventsWithoutClosingClient(): void
     {
         $queue = new MemoryEventQueue();

@@ -14,35 +14,6 @@ use SensorsWave\Model\UserPropertyOptions;
 
 final class ModelTest extends TestCase
 {
-    public function testEventNormalizeInjectsDefaultLibraryProperties(): void
-    {
-        $event = Event::create('anon-123', 'user-456', 'TestEvent')
-            ->withProperties(Properties::create()->set('custom_prop', 'value'));
-
-        $event->normalize();
-
-        self::assertSame('php', $event->properties()->get('$lib'));
-        self::assertSame(\SensorsWave\Support\SDKInfo::VERSION, $event->properties()->get('$lib_version'));
-        self::assertSame('value', $event->properties()->get('custom_prop'));
-        self::assertNotSame('', $event->traceId());
-        self::assertGreaterThan(0, $event->time());
-    }
-
-    public function testEventNormalizeDoesNotOverwriteExistingLibraryProperties(): void
-    {
-        $event = Event::create('anon-123', 'user-456', 'CustomEvent')
-            ->withProperties(
-                Properties::create()
-                    ->set('$lib', 'custom-lib')
-                    ->set('$lib_version', 'custom-version')
-            );
-
-        $event->normalize();
-
-        self::assertSame('custom-lib', $event->properties()->get('$lib'));
-        self::assertSame('custom-version', $event->properties()->get('$lib_version'));
-    }
-
     public function testEventNormalizeRequiresAtLeastOneUserId(): void
     {
         $event = Event::create('', '', 'TestEvent');
