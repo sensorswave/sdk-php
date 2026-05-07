@@ -301,18 +301,6 @@ final class ExperimentEvaluationTest extends TestCase
         }
     }
 
-    public function testExp002ExperimentPublicAssignsVariantAndPayload(): void
-    {
-        $this->assertNotFalse(strpos($this->name(), 'Exp002'));
-        $this->testExperimentPublicAssignsVariantAndPayload();
-    }
-
-    public function testExp004ExperimentHoldoutCanReturnHoldoutVariant(): void
-    {
-        $this->assertNotFalse(strpos($this->name(), 'Exp004'));
-        $this->testExperimentHoldoutCanReturnHoldoutVariant();
-    }
-
     public function testExp007ExperimentStickyUsesCacheAndPersistsResult(): void
     {
         $this->assertNotFalse(strpos($this->name(), 'Exp007'));
