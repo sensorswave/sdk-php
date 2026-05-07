@@ -676,18 +676,6 @@ final class GateEvaluationTest extends TestCase
         $core->evaluate(new User('', 'u'), 'broken_bucket_gate', ABCore::TYPE_GATE);
     }
 
-    public function testGate021GateHoldoutAndDependentGateFail(): void
-    {
-        $this->assertNotFalse(strpos($this->name(), 'Gate021'));
-        $this->testGateHoldoutAndDependentGateFail();
-    }
-
-    public function testGate022GateComplicateRuleChain(): void
-    {
-        $this->assertNotFalse(strpos($this->name(), 'Gate022'));
-        $this->testGateComplicateRuleChain();
-    }
-
     public function testGate026InvalidCommonConditionRaisesRuntimeException(): void
     {
         $this->assertNotFalse(strpos($this->name(), 'Gate026'));
