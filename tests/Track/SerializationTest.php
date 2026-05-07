@@ -18,8 +18,7 @@ use SensorsWave\Tracking\UserPropertyEventFactory;
  *   - property-datetime-iso8601-utc capability 范围的时间归一化测试（不属 tracking-core）。
  *
  * tracking-core 的 A 类方法（identify / basic-track-event / profile-set 默认属性等）
- * 已迁移到 tests/Conformance/TrackingCoreConformanceTest（完全派生模式）。
- * 详见 docs/specs/testing-strategy.md 与 testing-derivation-pilot.md。
+ * 已迁移到 tests/Conformance/TrackingCoreTest（完全派生模式）。
  */
 final class SerializationTest extends TestCase
 {

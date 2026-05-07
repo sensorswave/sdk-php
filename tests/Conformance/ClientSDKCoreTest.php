@@ -15,21 +15,17 @@ use SensorsWave\Tests\Support\MemoryEventQueue;
 use SensorsWave\Worker\SendCommand;
 
 /**
- * ClientSDKCoreConformanceTest — A 类完全派生测试。
+ * ClientSDKCoreTest — A 类完全派生测试。
  *
  * 输入与期望值都来自 tests/Fixtures/conformance/{fixtures,golden}/client-sdk-core.json
- * （由 backend-sdk-harness 通过 scripts/sync_ab_testdata.py --conformance-data 同步）。
  * 不在本测试代码硬编码任何 spec 字面量或 expected 值。
  *
  * client-sdk-core 在 conformance 中验证「client → endpoint 解析、close 触发 flush、batch
  * 形态」是输入到捕获请求的确定性映射，仍属 A 类。sdk-php 路径用 FakeTransport 注入
- * Config，无需 in-process server（与 sdk-go httptest 模式不同）。执行逻辑照搬
- * conformance/adapters/php/client_sdk_core.php，与 conformance runner 各持一份是派生
- * 模式 DRY 局限的实例（参 docs/specs/testing-derivation-pilot.md 第 11.3 节）。
- *
- * 详见 docs/specs/testing-strategy.md 第 4.1 / 5 节。
+ * Config，无需 in-process server（与 sdk-go httptest 模式不同）。执行逻辑与
+ * conformance/adapters/php/client_sdk_core.php 保持同义。
  */
-final class ClientSDKCoreConformanceTest extends TestCase
+final class ClientSDKCoreTest extends TestCase
 {
     /**
      * @return iterable<string, array{0: array<string, mixed>, 1: array<string, mixed>}>

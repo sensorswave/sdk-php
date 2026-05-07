@@ -11,8 +11,7 @@ use SensorsWave\Signing\RequestSigner;
  * RequestSignerTest — sign-003 / sign-004 / sign-005 三条 C 类（unit_test 类）签名测试。
  *
  * sign-001 / sign-002 的 A 类覆盖已迁移到
- * tests/Conformance/RequestSigningACS3ConformanceTest（完全派生模式）。
- * 详见 docs/specs/testing-strategy.md 与 testing-derivation-pilot.md。
+ * tests/Conformance/RequestSigningACS3Test（完全派生模式）。
  */
 final class RequestSignerTest extends TestCase
 {

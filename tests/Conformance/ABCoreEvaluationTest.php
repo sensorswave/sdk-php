@@ -12,25 +12,23 @@ use SensorsWave\Contract\StickyHandlerInterface;
 use SensorsWave\Model\User;
 
 /**
- * ABCoreEvaluationConformanceTest — A 类完全派生测试。
+ * ABCoreEvaluationTest — A 类完全派生测试。
  *
  * 输入与期望值都来自 tests/Fixtures/conformance/{fixtures,golden}/ab-core-evaluation.json
  * + spec_file 间接引用 tests/testdata/{config,gate,exp}/ 下的 spec JSON。
  *
- * 与 ab-meta-snapshot-bootstrap 同 spec_file 路径 A：派生测试在 case 内通过
- * StorageFactory::fromJson 公开 API 加载 spec → ABCore::evaluate 拿评估结果。
+ * 派生测试在 case 内通过 StorageFactory::fromJson 公开 API 加载 spec，
+ * 调 ABCore::evaluate 拿评估结果。
  *
  * eval_mode：single（单用户 → variant_id+check_gate+variant_params）/ distribution
  * （多用户 → 排序后的 variant_id 分布）。sticky_cache 通过 MemoryStickyHandler 注入。
  *
  * 与 conformance/runners/php/ab_core_evaluation.py 对齐：variant_params=null 时
  * actual==expected 容忍 actual 不带该 key（result_comparator 行为）。
- *
- * 详见 docs/specs/testing-strategy.md 第 4.1 / 5 节。
  */
-final class ABCoreEvaluationConformanceTest extends TestCase
+final class ABCoreEvaluationTest extends TestCase
 {
-    /** @var array<string, string> spec_file → JSON 内容；ab-core fixture 116 cases 仅 49 unique */
+    /** @var array<string, string> spec_file → JSON 内容；ab-core fixture 116 cases 仅 49 unique。 */
     private static array $specCache = [];
 
     /**

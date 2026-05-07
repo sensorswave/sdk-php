@@ -12,8 +12,6 @@ namespace SensorsWave\Tests\Conformance;
  *   - substituteLibForPhp：injected 模式下把 expected 的 `$lib`="go" 替换为 "php"
  *     （golden 由 sdk-go 参考实现生成 `$lib`="go"）
  *   - stripLibVersion：删除 `$lib_version`（运行时变量，值随 SDK 版本演化）
- *
- * 详见 docs/specs/testing-strategy.md（A 类完全派生）与 testing-derivation-pilot.md。
  */
 final class EventComparator
 {

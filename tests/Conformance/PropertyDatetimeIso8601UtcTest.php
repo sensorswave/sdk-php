@@ -15,11 +15,10 @@ use SensorsWave\Tracking\Predefined;
 use SensorsWave\Tracking\UserPropertyEventFactory;
 
 /**
- * PropertyDatetimeIso8601UtcConformanceTest — A 类完全派生测试。
+ * PropertyDatetimeIso8601UtcTest — A 类完全派生测试。
  *
  * 输入与期望值都来自
  * tests/Fixtures/conformance/{fixtures,golden}/property-datetime-iso8601-utc.json
- * （由 backend-sdk-harness 通过 scripts/sync_ab_testdata.py --conformance-data 同步）。
  * 不在本测试代码硬编码任何 spec 字面量或 expected 值。
  *
  * fixture 字符串语义为 UTC 墙上时间；测试代码（与 conformance adapter 一致）把
@@ -28,10 +27,8 @@ use SensorsWave\Tracking\UserPropertyEventFactory;
  *
  * 与 conformance/runners/php/property_datetime_iso8601_utc.py 对齐：`injected` 模式下
  * 从两边比较前 substitute `$lib`="php" + 删除 `$lib_version`。
- *
- * 详见 docs/specs/testing-strategy.md 第 4.1 / 5 节。
  */
-final class PropertyDatetimeIso8601UtcConformanceTest extends TestCase
+final class PropertyDatetimeIso8601UtcTest extends TestCase
 {
     /**
      * @return iterable<string, array{0: array<string, mixed>, 1: array<string, mixed>}>

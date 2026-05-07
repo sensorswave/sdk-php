@@ -9,15 +9,12 @@ use PHPUnit\Framework\TestCase;
 use SensorsWave\Signing\RequestSigner;
 
 /**
- * RequestSigningACS3ConformanceTest — A 类完全派生测试。
+ * RequestSigningACS3Test — A 类完全派生测试。
  *
  * 输入与期望值都来自 tests/Fixtures/conformance/{fixtures,golden}/request-signing-acs3.json
- * （由 backend-sdk-harness 通过 scripts/sync_ab_testdata.py --conformance-data 同步）。
  * 不在本测试代码里硬编码任何 spec 字面量或 expected 值。
- *
- * 详见 docs/specs/testing-strategy.md 第 4.1 / 5 节。
  */
-final class RequestSigningACS3ConformanceTest extends TestCase
+final class RequestSigningACS3Test extends TestCase
 {
     /**
      * @return iterable<string, array{0: array<string, mixed>, 1: array<string, mixed>}>

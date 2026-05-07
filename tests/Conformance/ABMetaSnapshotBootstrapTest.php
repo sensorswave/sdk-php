@@ -11,21 +11,18 @@ use SensorsWave\ABTesting\Storage;
 use SensorsWave\ABTesting\StorageFactory;
 
 /**
- * ABMetaSnapshotBootstrapConformanceTest — A 类完全派生测试。
+ * ABMetaSnapshotBootstrapTest — A 类完全派生测试。
  *
  * 输入与期望值都来自 tests/Fixtures/conformance/{fixtures,golden}/ab-meta-snapshot-bootstrap.json
  * + spec_file 间接引用 tests/testdata/{config,gate}/ 下的 spec JSON。
  *
- * 与 ab-core-evaluation 同模式：派生测试在每个 case 内通过 StorageFactory::fromJson
- * 公开 API 加载 spec，调 ABCore::getABSpecs 导出快照（含 fromJson 回环 + normalize），
+ * 派生测试在每个 case 内通过 StorageFactory::fromJson 公开 API 加载 spec，
+ * 调 ABCore::getABSpecs 导出快照（含 fromJson 回环 + normalize），
  * 再与 golden 比较。
  *
- * 执行逻辑照搬 conformance/adapters/php/ab_meta_snapshot_bootstrap.php，与 conformance
- * runner 各持一份是派生模式 DRY 局限的实例。
- *
- * 详见 docs/specs/testing-strategy.md 第 4.1 / 5 节。
+ * 执行逻辑与 conformance/adapters/php/ab_meta_snapshot_bootstrap.php 保持同义。
  */
-final class ABMetaSnapshotBootstrapConformanceTest extends TestCase
+final class ABMetaSnapshotBootstrapTest extends TestCase
 {
     /**
      * @return iterable<string, array{0: array<string, mixed>, 1: array<string, mixed>}>

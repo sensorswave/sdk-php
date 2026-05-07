@@ -12,10 +12,9 @@ use SensorsWave\Model\UserPropertyOptions;
 use SensorsWave\Tracking\Predefined;
 
 /**
- * UserProfileOpsConformanceTest — A 类完全派生测试。
+ * UserProfileOpsTest — A 类完全派生测试。
  *
  * 输入与期望值都来自 tests/Fixtures/conformance/{fixtures,golden}/user-profile-ops.json
- * （由 backend-sdk-harness 通过 scripts/sync_ab_testdata.py --conformance-data 同步）。
  * 不在本测试代码硬编码任何 spec 字面量或 expected 值。
  *
  * case 覆盖 5 种 profile 操作（profile_append / profile_union / profile_increment /
@@ -25,10 +24,8 @@ use SensorsWave\Tracking\Predefined;
  * 与 conformance/runners/php/user_profile_ops.py 对齐：
  * `injected` 模式下从两边比较前 substitute `$lib`="php"（golden 由 Go 参考实现生成
  * `$lib`="go"）+ 删除 `$lib_version`（运行时变量）。
- *
- * 详见 docs/specs/testing-strategy.md 第 4.1 / 5 节。
  */
-final class UserProfileOpsConformanceTest extends TestCase
+final class UserProfileOpsTest extends TestCase
 {
     /**
      * @return iterable<string, array{0: array<string, mixed>, 1: array<string, mixed>}>

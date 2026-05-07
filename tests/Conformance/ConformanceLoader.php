@@ -9,12 +9,9 @@ use PHPUnit\Framework\Assert;
 /**
  * 加载 conformance fixture 与 golden，返回 cases 数组与按 case id 索引的 expected。
  *
- * 路径硬编码为 tests/Fixtures/conformance/{fixtures,golden}/<capability>.json,
- * 副本由 backend-sdk-harness 的 scripts/sync_ab_testdata.py --conformance-data 同步。
+ * 路径硬编码为 tests/Fixtures/conformance/{fixtures,golden}/<capability>.json。
  *
- * 接口语义对齐 sdk-go 的 loadConformance（参 sdk-go/conformance_test_helpers_test.go）。
- *
- * 详见 docs/specs/testing-strategy.md（A 类完全派生）与 testing-derivation-pilot.md。
+ * 接口语义对齐 sdk-go 的 loadConformance。
  */
 final class ConformanceLoader
 {
