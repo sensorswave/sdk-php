@@ -45,6 +45,10 @@ final class ABMetaSnapshotBootstrapTest extends TestCase
     #[DataProvider('caseProvider')]
     public function testCase(array $case, array $expected): void
     {
+        if (!self::caseAppliesTo($case, 'php')) {
+            $this->markTestSkipped('case does not apply to php');
+        }
+
         $specPath = self::testdataDir() . '/' . (string) $case['spec_file'];
         $raw = file_get_contents($specPath);
         self::assertNotFalse($raw, "read spec file: $specPath");
@@ -116,6 +120,18 @@ final class ABMetaSnapshotBootstrapTest extends TestCase
     private static function testdataDir(): string
     {
         return dirname(__DIR__) . '/testdata';
+    }
+
+    /**
+     * @param array<string, mixed> $case
+     */
+    private static function caseAppliesTo(array $case, string $language): bool
+    {
+        if (!isset($case['languages']) || !is_array($case['languages'])) {
+            return true;
+        }
+
+        return in_array($language, $case['languages'], true);
     }
 
     /**
