@@ -174,9 +174,7 @@ final class ABCore
                     $result->variantId = $rule->override;
                     $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
                 }
-                if ($rule->id !== '') {
-                    $result->decisionRuleId = $rule->id;
-                }
+                $this->setDecisionRuleId($result, $rule);
 
                 return true;
             }
@@ -198,9 +196,7 @@ final class ABCore
                     $result->variantId = $rule->override;
                     $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
                 }
-                if ($rule->id !== '') {
-                    $result->decisionRuleId = $rule->id;
-                }
+                $this->setDecisionRuleId($result, $rule);
 
                 return true;
             }
@@ -218,9 +214,7 @@ final class ABCore
         foreach ($rules as $rule) {
             $decision = $this->evaluateRule($user, $rule, $evalId);
             if ($decision['matched']) {
-                if ($rule->id !== '') {
-                    $result->decisionRuleId = $rule->id;
-                }
+                $this->setDecisionRuleId($result, $rule);
                 if ($decision['pass'] && $rule->override !== null) {
                     $result->variantId = $rule->override;
                     $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
@@ -231,6 +225,17 @@ final class ABCore
         }
 
         return false;
+    }
+
+    private function setDecisionRuleId(ABResult $result, Rule $rule): void
+    {
+        if ($rule->decisionRuleId !== '') {
+            $result->decisionRuleId = $rule->decisionRuleId;
+            return;
+        }
+        if ($rule->id !== '') {
+            $result->decisionRuleId = $rule->id;
+        }
     }
 
     /**
@@ -244,9 +249,7 @@ final class ABCore
             if ($decision['pass'] && $rule->override !== null) {
                 $result->variantId = $rule->override;
                 $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
-                if ($rule->id !== '') {
-                    $result->decisionRuleId = $rule->id;
-                }
+                $this->setDecisionRuleId($result, $rule);
                 return;
             }
         }
@@ -280,16 +283,18 @@ final class ABCore
      */
     private function evaluateCondition(User $user, Condition $condition, string $evalId): bool
     {
+        $operator = strtolower($condition->operator);
         $left = match (strtolower($condition->fieldClass)) {
             'common' => $this->commonValue($condition->field),
             'ffuser' => $this->ffUserValue($user, $condition->field),
             'props' => $user->abUserProperties()->get($condition->field),
-            'bucket' => $condition->field,
+            'bucket' => $operator === 'bucket_set'
+                ? $condition->field
+                : (float) $this->hashModulo($evalId, $condition->field, 10000),
             'target' => null,
             default => $condition->field,
         };
 
-        $operator = strtolower($condition->operator);
         return match ($operator) {
             'gt' => $this->compareNumbers($left, $condition->value, static fn (float $a, float $b): bool => $a > $b),
             'gte' => $this->compareNumbers($left, $condition->value, static fn (float $a, float $b): bool => $a >= $b),

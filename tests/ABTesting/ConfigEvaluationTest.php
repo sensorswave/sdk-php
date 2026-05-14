@@ -13,36 +13,14 @@ use SensorsWave\Tests\Support\MemoryStickyHandler;
 
 final class ConfigEvaluationTest extends TestCase
 {
-    public function testConfigPublicFirstMatchWinsOnlyFirstRuleApplies(): void
+    public function testConfigPublicAssignsVariantsWithinMatchedRule(): void
     {
         $core = new ABCore(FixtureLoader::loadStorageFromJson(
             dirname(__DIR__) . '/testdata/config/public.json'
         ));
 
-        // First-match-wins: all users match rule 1 (IS_TRUE), only ~10% pass rollout → v1.
-        // The remaining ~90% match but fail rollout → gate returns false → no variant.
-        $totalUsers = 1000;
-        $v1Count = 0;
-        $nilCount = 0;
-
-        for ($index = 0; $index < $totalUsers; $index++) {
-            $result = $core->evaluate(
-                new User('', 'config-public-user-' . $index),
-                'bMHsfOAUKx',
-                ABCore::TYPE_CONFIG
-            );
-
-            if ($result->variantId !== null) {
-                self::assertSame('v1', $result->variantId);
-                self::assertSame('blue', $result->getString('color', ''));
-                $v1Count++;
-            } else {
-                $nilCount++;
-            }
-        }
-
-        self::assertEqualsWithDelta(0.10, $v1Count / $totalUsers, 0.05);
-        self::assertSame($totalUsers, $v1Count + $nilCount);
+        $counts = self::sampleConfigVariants($core, 'config-public-user');
+        self::assertConfigVariantSplit($counts['variants']);
     }
 
     public function testConfigOverrideHonorsExplicitUserRule(): void
@@ -82,34 +60,67 @@ final class ConfigEvaluationTest extends TestCase
             dirname(__DIR__) . '/testdata/config/holdout.json'
         ));
 
-        // Traffic rule: rollout 90 → ~10% holdout.
-        // First-match-wins gate: all non-holdout users match rule 1 (IS_TRUE), only ~10% pass rollout → v1.
-        $totalUsers = 1000;
-        $holdoutCount = 0;
-        $v1Count = 0;
-        $nilCount = 0;
+        $counts = self::sampleConfigVariants($core, 'config-holdout-user');
 
-        for ($index = 0; $index < $totalUsers; $index++) {
+        self::assertEqualsWithDelta(0.10, $counts['holdout'] / $counts['total'], 0.03);
+        self::assertSame($counts['total'], $counts['holdout'] + $counts['variants']['total']);
+        self::assertConfigVariantSplit($counts['variants']);
+    }
+
+    /**
+     * @return array{total: int, holdout: int, variants: array{total: int, v1: int, v2: int, v3: int}}
+     */
+    private static function sampleConfigVariants(ABCore $core, string $userPrefix): array
+    {
+        $counts = [
+            'total' => 1000,
+            'holdout' => 0,
+            'variants' => ['total' => 0, 'v1' => 0, 'v2' => 0, 'v3' => 0],
+        ];
+
+        for ($index = 0; $index < $counts['total']; $index++) {
             $result = $core->evaluate(
-                new User('', 'config-holdout-user-' . $index),
+                new User('', $userPrefix . '-' . $index),
                 'bMHsfOAUKx',
                 ABCore::TYPE_CONFIG
             );
 
-            if ($result->variantId === null) {
-                $nilCount++;
-            } elseif ($result->variantId === 'holdout') {
-                $holdoutCount++;
-            } else {
-                self::assertSame('v1', $result->variantId);
-                $v1Count++;
+            switch ($result->variantId) {
+                case 'holdout':
+                    $counts['holdout']++;
+                    break;
+                case 'v1':
+                    self::assertSame('blue', $result->getString('color', ''));
+                    $counts['variants']['v1']++;
+                    $counts['variants']['total']++;
+                    break;
+                case 'v2':
+                    self::assertSame('red', $result->getString('color', ''));
+                    $counts['variants']['v2']++;
+                    $counts['variants']['total']++;
+                    break;
+                case 'v3':
+                    self::assertSame('orange', $result->getString('color', ''));
+                    $counts['variants']['v3']++;
+                    $counts['variants']['total']++;
+                    break;
+                default:
+                    self::fail('Expected holdout or a config variant, got ' . var_export($result->variantId, true));
             }
         }
 
-        self::assertEqualsWithDelta(0.10, $holdoutCount / $totalUsers, 0.03);
-        $nonHoldout = $totalUsers - $holdoutCount;
-        self::assertEqualsWithDelta(0.10, $v1Count / $nonHoldout, 0.05);
-        self::assertSame($totalUsers, $holdoutCount + $v1Count + $nilCount);
+        return $counts;
+    }
+
+    /**
+     * @param array{total: int, v1: int, v2: int, v3: int} $counts
+     */
+    private static function assertConfigVariantSplit(array $counts): void
+    {
+        self::assertSame($counts['total'], $counts['v1'] + $counts['v2'] + $counts['v3']);
+        self::assertEqualsWithDelta(0.10, $counts['v1'] / $counts['total'], 0.05);
+        self::assertEqualsWithDelta(0.30, $counts['v2'] / $counts['total'], 0.05);
+        self::assertEqualsWithDelta(0.60, $counts['v3'] / $counts['total'], 0.05);
     }
 
     public function testConfigStickyUsesCacheAndPersistsResult(): void

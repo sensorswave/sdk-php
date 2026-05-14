@@ -19,6 +19,7 @@ final class Rule
         public readonly float $rollout,
         public readonly array $conditions,
         public readonly ?string $override,
+        public readonly string $decisionRuleId = '',
     ) {
     }
 
@@ -48,6 +49,7 @@ final class Rule
             (float) ($data['rollout'] ?? 0),
             $conditions,
             $override,
+            (string) ($data['decision_rule_id'] ?? ''),
         );
     }
 
@@ -58,7 +60,7 @@ final class Rule
      */
     public function toArray(): array
     {
-        return [
+        $payload = [
             'name' => $this->name,
             'id' => $this->id,
             'salt' => $this->salt,
@@ -69,5 +71,11 @@ final class Rule
             ),
             'override' => $this->override,
         ];
+
+        if ($this->decisionRuleId !== '') {
+            $payload['decision_rule_id'] = $this->decisionRuleId;
+        }
+
+        return $payload;
     }
 }
