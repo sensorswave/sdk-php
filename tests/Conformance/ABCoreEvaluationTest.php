@@ -120,15 +120,6 @@ final class ABCoreEvaluationTest extends TestCase
             $actual['decision_rule_id'] = $result->decisionRuleId;
         }
 
-        // 与 conformance/runners/php/ab_core_evaluation.py 的 result_comparator 对齐：
-        // golden variant_params==null 时容忍 actual 实际有 params 值（adapter 测的是
-        // gate / config / experiment，gate 不携带 params；fixture 用 single-key eval 不验
-        // 完整 variant_params）。
-        if (is_array($expected) && array_key_exists('variant_params', $expected)
-            && $expected['variant_params'] === null) {
-            $actual['variant_params'] = null;
-        }
-
         self::assertEquals($expected, $actual, 'single eval result should match golden');
     }
 
