@@ -215,6 +215,19 @@ final class ABCore
             $decision = $this->evaluateRule($user, $rule, $evalId);
             if ($decision['matched']) {
                 $this->setDecisionRuleId($result, $rule);
+                if ($rule->variantGroup !== []) {
+                    if (!$decision['pass']) {
+                        return false;
+                    }
+                    $variantId = $this->selectVariantFromGroup($rule, $evalId);
+                    if ($variantId !== null) {
+                        $result->variantId = $variantId;
+                        $result->variantParamValue = $spec->variantValues[$variantId] ?? [];
+                        return true;
+                    }
+
+                    return false;
+                }
                 if ($decision['pass'] && $rule->override !== null) {
                     $result->variantId = $rule->override;
                     $result->variantParamValue = $spec->variantValues[$rule->override] ?? [];
@@ -256,16 +269,42 @@ final class ABCore
     }
 
     /**
+     * 按 Config variant_group 的累计 rollout 阈值选择变体。
+     */
+    private function selectVariantFromGroup(Rule $rule, string $evalId): ?string
+    {
+        $salt = $rule->salt !== '' ? $rule->salt : $rule->id;
+        $bucket = $this->hashModulo($evalId, $salt, 10000);
+        foreach ($rule->variantGroup as $group) {
+            if ($bucket < $this->rolloutBucketThreshold($group->rollout)) {
+                return $group->variantId;
+            }
+        }
+
+        return null;
+    }
+
+    private function rolloutBucketThreshold(float $rollout): int
+    {
+        if ($rollout <= 0) {
+            return 0;
+        }
+        if ($rollout >= 100) {
+            return 10000;
+        }
+
+        return (int) round($rollout * 100);
+    }
+
+    /**
      * 处理单条规则。
      *
      * @return array{matched: bool, pass: bool}
      */
     private function evaluateRule(User $user, Rule $rule, string $evalId): array
     {
-        foreach ($rule->conditions as $condition) {
-            if (!$this->evaluateCondition($user, $condition, $evalId)) {
-                return ['matched' => false, 'pass' => false];
-            }
+        if (!$this->evaluateRuleConditions($user, $rule, $evalId)) {
+            return ['matched' => false, 'pass' => false];
         }
 
         if ($rule->rollout === 100.0) {
@@ -274,8 +313,19 @@ final class ABCore
         if ($rule->rollout === 0.0) {
             return ['matched' => true, 'pass' => false];
         }
-        $pass = $this->hashModulo($evalId, $rule->salt, 10000) < (int) round($rule->rollout * 100);
+        $pass = $this->hashModulo($evalId, $rule->salt, 10000) < $this->rolloutBucketThreshold($rule->rollout);
         return ['matched' => true, 'pass' => $pass];
+    }
+
+    private function evaluateRuleConditions(User $user, Rule $rule, string $evalId): bool
+    {
+        foreach ($rule->conditions as $condition) {
+            if (!$this->evaluateCondition($user, $condition, $evalId)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

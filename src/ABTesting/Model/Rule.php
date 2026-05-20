@@ -11,6 +11,7 @@ final class Rule
 {
     /**
      * @param list<Condition> $conditions
+     * @param list<VariantGroup> $variantGroup
      */
     public function __construct(
         public readonly string $name,
@@ -20,6 +21,7 @@ final class Rule
         public readonly array $conditions,
         public readonly ?string $override,
         public readonly string $decisionRuleId = '',
+        public readonly array $variantGroup = [],
     ) {
     }
 
@@ -37,6 +39,13 @@ final class Rule
             }
         }
 
+        $variantGroup = [];
+        foreach (($data['variant_group'] ?? []) as $group) {
+            if (is_array($group)) {
+                $variantGroup[] = VariantGroup::fromArray($group);
+            }
+        }
+
         $override = $data['override'] ?? null;
         if ($override !== null && !is_string($override)) {
             $override = (string) $override;
@@ -50,6 +59,7 @@ final class Rule
             $conditions,
             $override,
             (string) ($data['decision_rule_id'] ?? ''),
+            $variantGroup,
         );
     }
 
@@ -74,6 +84,13 @@ final class Rule
 
         if ($this->decisionRuleId !== '') {
             $payload['decision_rule_id'] = $this->decisionRuleId;
+        }
+
+        if ($this->variantGroup !== []) {
+            $payload['variant_group'] = array_map(
+                static fn (VariantGroup $group): array => $group->toArray(),
+                $this->variantGroup
+            );
         }
 
         return $payload;

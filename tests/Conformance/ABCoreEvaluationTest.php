@@ -116,6 +116,9 @@ final class ABCoreEvaluationTest extends TestCase
             'check_gate' => $result->checkFeatureGate(),
             'variant_params' => $result->variantParamValue === [] ? null : $result->variantParamValue,
         ];
+        if (is_array($expected) && array_key_exists('decision_rule_id', $expected)) {
+            $actual['decision_rule_id'] = $result->decisionRuleId;
+        }
 
         // 与 conformance/runners/php/ab_core_evaluation.py 的 result_comparator 对齐：
         // golden variant_params==null 时容忍 actual 实际有 params 值（adapter 测的是
