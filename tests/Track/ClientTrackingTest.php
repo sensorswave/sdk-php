@@ -171,7 +171,7 @@ final class ClientTrackingTest extends TestCase
         self::assertSame('FlushTwo', json_decode($messages[1]->payload, true)['event']);
     }
 
-    public function testTrackFlushesWhenBatchReachesFiftyEvents(): void
+    public function testTrackEnqueuesEveryEventWithoutRequestPathFlush(): void
     {
         $queue = new MemoryEventQueue();
         $client = Client::create(

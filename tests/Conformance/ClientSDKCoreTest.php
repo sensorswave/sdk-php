@@ -74,7 +74,7 @@ final class ClientSDKCoreTest extends TestCase
 
         $preCloseRequestCount = count($transport->requests);
         $client->close();
-        // Client.close() 只把 pending 推入 eventQueue；transport 由独立 worker 进程驱动。
+        // Track 请求路径只写 eventQueue；transport 由独立 worker 进程驱动。
         // 派生测试在同进程内显式跑 SendCommand 把 queue 流到 transport。
         (new SendCommand($endpoint, 'test-token', $config, $transport))->run();
 

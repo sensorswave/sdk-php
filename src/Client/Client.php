@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace SensorsWave\Client;
 
+use InvalidArgumentException;
 use JsonException;
 use SensorsWave\ABTesting\ABCore;
 use SensorsWave\ABTesting\ABResult;
 use SensorsWave\ABTesting\ExposureLogging\ABImpressionFactory;
 use SensorsWave\ABTesting\StorageFactory;
-use InvalidArgumentException;
 use SensorsWave\Config\Config;
 use SensorsWave\Exception\EmptyUserIdsException;
 use SensorsWave\Exception\IdentifyRequiresBothIdsException;
@@ -18,6 +18,7 @@ use SensorsWave\Model\ListProperties;
 use SensorsWave\Model\Properties;
 use SensorsWave\Model\User;
 use SensorsWave\Model\UserPropertyOptions;
+use SensorsWave\Support\Endpoint;
 use SensorsWave\Tracking\EventSerializer;
 use SensorsWave\Tracking\Predefined;
 use SensorsWave\Tracking\UserPropertyEventFactory;
@@ -30,16 +31,10 @@ final class Client
     public const AB_TYPE_GATE = 1;
     public const AB_TYPE_CONFIG = 2;
     public const AB_TYPE_EXPERIMENT = 3;
-    private const MAX_BATCH_SIZE = 50;
-    private const MAX_HTTP_BODY_SIZE = 5 * 1024 * 1024;
 
     private bool $closed = false;
     private ?ABCore $abCore = null;
     private readonly ?\SensorsWave\Contract\StickyHandlerInterface $stickyHandler;
-    /** @var list<string> */
-    private array $pendingMessages = [];
-    private int $pendingBodySize = 0;
-    private ?int $lastTrackFlushAtMs = null;
 
     private function __construct(
         string $endpoint,
@@ -69,12 +64,14 @@ final class Client
             return;
         }
 
-        $this->flushPendingTrackMessages();
         $this->closed = true;
     }
 
     /**
-     * Flush buffered tracking events immediately.
+     * Lifecycle-compatible no-op.
+     *
+     * PHP request-path tracking writes every event directly into EventQueue;
+     * HTTP delivery is handled by SendCommand.
      */
     public function flush(): void
     {
@@ -82,7 +79,7 @@ final class Client
             return;
         }
 
-        $this->flushPendingTrackMessages();
+        // Track writes directly to EventQueue; remote delivery is handled by SendCommand.
     }
 
     /**
@@ -134,7 +131,6 @@ final class Client
         }
 
         $event->normalize();
-        $this->flushPendingTrackMessagesIfDue();
         $this->enqueueTrackMessage(EventSerializer::serialize($event));
     }
 
@@ -451,51 +447,14 @@ final class Client
      */
     private function enqueueTrackMessage(string $message): void
     {
-        $this->pendingMessages[] = $message;
-        $this->pendingBodySize += strlen($message);
-
-        if (count($this->pendingMessages) >= self::MAX_BATCH_SIZE || $this->pendingBodySize >= self::MAX_HTTP_BODY_SIZE) {
-            $this->flushPendingTrackMessages();
-        }
-    }
-
-    /**
-     * 在队列 flush 间隔到期时发送积压事件。
-     */
-    private function flushPendingTrackMessagesIfDue(): void
-    {
-        if ($this->config->flushIntervalMs <= 0 || $this->lastTrackFlushAtMs === null) {
-            return;
-        }
-
-        if ($this->nowMs() - $this->lastTrackFlushAtMs >= $this->config->flushIntervalMs) {
-            $this->flushPendingTrackMessages();
-        }
-    }
-
-    /**
-     * 将待发送事件批量刷出。
-     */
-    private function flushPendingTrackMessages(): void
-    {
-        if ($this->pendingMessages === []) {
-            return;
-        }
-
-        $payloads = $this->pendingMessages;
-        $this->pendingMessages = [];
-        $this->pendingBodySize = 0;
-        $this->lastTrackFlushAtMs = $this->nowMs();
-
         try {
-            $this->config->eventQueue->enqueue($payloads);
+            $this->config->eventQueue->enqueue([$message]);
         } catch (\Throwable $throwable) {
             $this->config->logger->error(
                 'event queue enqueue failed',
                 ['error' => $throwable->getMessage()]
             );
-            $body = '[' . implode(',', $payloads) . ']';
-            $this->notifyTrackFailure($body, $throwable, null);
+            $this->notifyTrackFailure('[' . $message . ']', $throwable, null);
         }
     }
 
@@ -586,27 +545,11 @@ final class Client
     }
 
     /**
-     * 当前时间戳（毫秒）。
-     */
-    private function nowMs(): int
-    {
-        return (int) floor(microtime(true) * 1000);
-    }
-
-    /**
      * 校验 endpoint 格式。
      */
     private static function validateEndpoint(string $endpoint): void
     {
-        $parts = parse_url($endpoint);
-        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
-            throw new InvalidArgumentException('endpoint is invalid');
-        }
-
-        $scheme = $parts['scheme'];
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            throw new InvalidArgumentException('scheme must be http or https');
-        }
+        Endpoint::normalizeEndpoint($endpoint);
     }
 
     public function __destruct()

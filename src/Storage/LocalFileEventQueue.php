@@ -7,6 +7,8 @@ namespace SensorsWave\Storage;
 use JsonException;
 use RuntimeException;
 use SensorsWave\Contract\EventQueueInterface;
+use SensorsWave\Contract\LoggerInterface;
+use SensorsWave\Support\DefaultLogger;
 
 /**
  * Local-file backed event queue.
@@ -16,10 +18,12 @@ final class LocalFileEventQueue implements EventQueueInterface
     private readonly string $queuePath;
     private readonly string $claimDirectory;
     private readonly string $lockPath;
+    private readonly LoggerInterface $logger;
 
     public function __construct(
         string $queuePath = '',
         string $claimDirectory = '',
+        ?LoggerInterface $logger = null,
     ) {
         $resolvedQueuePath = $queuePath !== ''
             ? $queuePath
@@ -31,14 +35,13 @@ final class LocalFileEventQueue implements EventQueueInterface
         $this->queuePath = $resolvedQueuePath;
         $this->claimDirectory = $resolvedClaimDirectory;
         $this->lockPath = $resolvedQueuePath . '.lock';
+        $this->logger = $logger ?? new DefaultLogger();
     }
 
     public function enqueue(array $payloads): void
     {
         $this->withLock(function () use ($payloads): void {
-            $queue = $this->readQueue();
-            array_push($queue, ...$payloads);
-            $this->writeQueue($queue);
+            $this->appendQueue($payloads);
         });
     }
 
@@ -129,12 +132,74 @@ final class LocalFileEventQueue implements EventQueueInterface
             return [];
         }
 
+        if (str_starts_with(ltrim($contents), '[')) {
+            return $this->decodeLegacyJsonQueue($contents);
+        }
+
+        return $this->decodeLineQueue($contents);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function decodeLegacyJsonQueue(string $contents): array
+    {
         try {
             /** @var list<string> $decoded */
             $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
             return $decoded;
         } catch (JsonException) {
             return [];
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function decodeLineQueue(string $contents): array
+    {
+        $queue = [];
+        foreach (preg_split('/\R/', $contents) ?: [] as $index => $line) {
+            if ($line === '') {
+                continue;
+            }
+            try {
+                $decoded = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException $exception) {
+                $this->logger->warn(
+                    'event queue line decode failed; skipping payload',
+                    ['line' => $index + 1, 'error' => $exception->getMessage()]
+                );
+                continue;
+            }
+            if (is_string($decoded)) {
+                $queue[] = $decoded;
+                continue;
+            }
+            $this->logger->warn(
+                'event queue line has invalid payload type; skipping payload',
+                ['line' => $index + 1]
+            );
+        }
+
+        return $queue;
+    }
+
+    /** @param list<string> $payloads */
+    private function appendQueue(array $payloads): void
+    {
+        if ($payloads === []) {
+            return;
+        }
+
+        $directory = dirname($this->queuePath);
+        if (!is_dir($directory) && !mkdir($directory, 0777, true) && !is_dir($directory)) {
+            throw new RuntimeException('failed to create event queue directory');
+        }
+
+        $lines = $this->encodeLineQueue($payloads);
+        if (file_put_contents($this->queuePath, $lines, FILE_APPEND | LOCK_EX) === false) {
+            throw new RuntimeException('failed to append event queue');
         }
     }
 
@@ -146,14 +211,8 @@ final class LocalFileEventQueue implements EventQueueInterface
             throw new RuntimeException('failed to create event queue directory');
         }
 
-        try {
-            $json = json_encode($queue, JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new RuntimeException('failed to encode event queue payload', 0, $exception);
-        }
-
         $tempPath = $this->queuePath . '.' . uniqid('tmp', true);
-        if (file_put_contents($tempPath, $json) === false) {
+        if (file_put_contents($tempPath, $this->encodeLineQueue($queue)) === false) {
             throw new RuntimeException('failed to write event queue');
         }
 
@@ -161,6 +220,23 @@ final class LocalFileEventQueue implements EventQueueInterface
             @unlink($tempPath);
             throw new RuntimeException('failed to move event queue into place');
         }
+    }
+
+    /**
+     * @param list<string> $payloads
+     */
+    private function encodeLineQueue(array $payloads): string
+    {
+        $lines = '';
+        foreach ($payloads as $payload) {
+            try {
+                $lines .= json_encode($payload, JSON_THROW_ON_ERROR) . PHP_EOL;
+            } catch (JsonException $exception) {
+                throw new RuntimeException('failed to encode event queue payload', 0, $exception);
+            }
+        }
+
+        return $lines;
     }
 
     /** @param list<string> $payloads */

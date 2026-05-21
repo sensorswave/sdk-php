@@ -9,6 +9,7 @@ use SensorsWave\ABTesting\ABCore;
 use SensorsWave\ABTesting\HttpSignatureMetaLoader;
 use SensorsWave\Config\ABConfig;
 use SensorsWave\Http\TransportInterface;
+use SensorsWave\Support\Endpoint;
 use RuntimeException;
 
 /**
@@ -31,9 +32,9 @@ final class SyncCommand
         }
 
         $endpoint = $this->config->metaEndpoint !== ''
-            ? $this->normalizeEndpoint($this->config->metaEndpoint)
-            : $this->normalizeEndpoint($this->endpoint);
-        $uriPath = $this->normalizeUriPath($this->config->metaUriPath, '/ab/all4eval');
+            ? Endpoint::normalizeEndpoint($this->config->metaEndpoint)
+            : Endpoint::normalizeEndpoint($this->endpoint);
+        $uriPath = Endpoint::normalizeUriPath($this->config->metaUriPath, '/ab/all4eval');
 
         try {
             $loader = new HttpSignatureMetaLoader(
@@ -56,32 +57,4 @@ final class SyncCommand
         }
     }
 
-    private function normalizeEndpoint(string $endpoint): string
-    {
-        $parts = parse_url($endpoint);
-        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
-            throw new \InvalidArgumentException('endpoint is invalid');
-        }
-
-        $scheme = $parts['scheme'];
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            throw new \InvalidArgumentException('scheme must be http or https');
-        }
-
-        $normalized = $scheme . '://' . $parts['host'];
-        if (isset($parts['port'])) {
-            $normalized .= ':' . $parts['port'];
-        }
-
-        return $normalized;
-    }
-
-    private function normalizeUriPath(string $uriPath, string $defaultPath): string
-    {
-        if ($uriPath === '') {
-            return $defaultPath;
-        }
-
-        return str_starts_with($uriPath, '/') ? $uriPath : '/' . $uriPath;
-    }
 }

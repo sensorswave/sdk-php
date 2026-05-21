@@ -6,6 +6,7 @@ namespace SensorsWave\Tests\Worker;
 
 use PHPUnit\Framework\TestCase;
 use SensorsWave\Config\Config;
+use SensorsWave\Http\ConcurrentTransportInterface;
 use SensorsWave\Http\Request;
 use SensorsWave\Http\Response;
 use SensorsWave\Http\TransportInterface;
@@ -97,5 +98,69 @@ final class SendCommandTest extends TestCase
         self::assertCount(1, $transport->requests);
         self::assertCount(0, $queue->claimed);
         self::assertSame([], $queue->dequeue(50));
+    }
+
+    public function testSendCommandUsesConfiguredConcurrencyForWorkerBatches(): void
+    {
+        $queue = new MemoryEventQueue();
+        $queue->enqueue(['{"event":"First"}', '{"event":"Second"}']);
+        $transport = new class implements ConcurrentTransportInterface {
+            /** @var list<int> */
+            public array $concurrentRequestCounts = [];
+
+            public function send(Request $request): Response
+            {
+                throw new \RuntimeException('serial send should not be used');
+            }
+
+            public function sendConcurrent(array $requests, int $concurrency): array
+            {
+                $this->concurrentRequestCounts[] = count($requests);
+                return array_map(fn(Request $request): Response => new Response(200, '{}'), $requests);
+            }
+        };
+
+        $command = new SendCommand(
+            'https://collector.example.com',
+            'test-token',
+            new Config(httpConcurrency: 2, eventQueue: $queue),
+            $transport
+        );
+
+        self::assertSame(0, $command->run(1));
+        self::assertSame([2], $transport->concurrentRequestCounts);
+        self::assertSame([], $queue->dequeue(50));
+    }
+
+    /**
+     * 超过配置阈值的发送批次应在 worker 内 gzip 压缩，Track 路径不承担 HTTP 处理。
+     */
+    public function testSendCommandGzipsBodyAboveConfiguredThreshold(): void
+    {
+        $queue = new MemoryEventQueue();
+        $queue->enqueue(['{"event":"GzipEvent"}']);
+        $transport = new class implements TransportInterface {
+            /** @var list<Request> */
+            public array $requests = [];
+
+            public function send(Request $request): Response
+            {
+                $this->requests[] = $request;
+                return new Response(200, '{}');
+            }
+        };
+
+        $command = new SendCommand(
+            'https://collector.example.com',
+            'test-token',
+            new Config(eventQueue: $queue, gzipThresholdBytes: 1),
+            $transport
+        );
+
+        self::assertSame(0, $command->run());
+        self::assertCount(1, $transport->requests);
+        $request = $transport->requests[0];
+        self::assertSame('gzip', $request->headers['Content-Encoding'] ?? null);
+        self::assertSame('[{"event":"GzipEvent"}]', gzdecode($request->body));
     }
 }

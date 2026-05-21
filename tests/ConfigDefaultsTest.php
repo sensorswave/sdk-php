@@ -18,7 +18,9 @@ final class ConfigDefaultsTest extends TestCase
         self::assertSame(10_000, $config->flushIntervalMs);
         self::assertSame(1, $config->httpConcurrency);
         self::assertSame(3_000, $config->httpTimeoutMs);
+        self::assertSame(3_000, $config->httpConnectTimeoutMs);
         self::assertSame(2, $config->httpRetry);
+        self::assertSame(1_048_576, $config->gzipThresholdBytes);
         self::assertInstanceOf(LocalFileEventQueue::class, $config->eventQueue);
     }
 

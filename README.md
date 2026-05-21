@@ -376,8 +376,8 @@ switch ($strategy) {
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| **close** | `close(): void` | Flush in-memory events into the local queue and close the client |
-| **flush** | `flush(): void` | Flush the current buffered batch into the local queue without closing |
+| **close** | `close(): void` | Mark the client closed; queued tracking events are delivered by `SendCommand` |
+| **flush** | `flush(): void` | Lifecycle-compatible no-op; PHP request-path tracking writes each event directly to `eventQueue` |
 
 ### User Identity
 
@@ -450,10 +450,12 @@ conflicting with list semantics.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `trackUriPath` | `string` | `/in/track` | Event tracking endpoint path |
-| `flushIntervalMs` | `int` | `10000` | In-memory batch rollover interval (ms) |
+| `flushIntervalMs` | `int` | `10000` | Reserved for lifecycle compatibility; request-path tracking writes directly to the event queue |
 | `httpConcurrency` | `int` | `1` | Worker-side request concurrency |
 | `httpTimeoutMs` | `int` | `3000` | Worker-side request timeout (ms) |
+| `httpConnectTimeoutMs` | `int` | `3000` | Worker-side connection timeout (ms) |
 | `httpRetry` | `int` | `2` | Worker-side retry attempts |
+| `gzipThresholdBytes` | `int` | `1048576` | Gzip worker request bodies larger than this threshold |
 | `eventQueue` | `EventQueueInterface` | Local file queue ⚠️ | Queue used by request-path tracking APIs |
 | `onTrackFailHandler` | `?callable` | `null` ⚠️ | Failure callback when queue writes fail |
 | `ab` | `?ABConfig` | `null` | A/B configuration (disabled by default) |

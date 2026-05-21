@@ -31,6 +31,8 @@ final class Config
         public readonly ?ABConfig $ab = null,
         public readonly ?TransportInterface $transport = null,
         ?EventQueueInterface $eventQueue = null,
+        public readonly int $gzipThresholdBytes = 1_048_576,
+        public readonly int $httpConnectTimeoutMs = 3_000,
     ) {
         $this->logger = $logger ?? new DefaultLogger();
         $this->onTrackFailHandler = $onTrackFailHandler !== null
