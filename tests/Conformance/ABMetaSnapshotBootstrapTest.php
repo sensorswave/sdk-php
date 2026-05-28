@@ -7,8 +7,12 @@ namespace SensorsWave\Tests\Conformance;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SensorsWave\ABTesting\ABCore;
+use SensorsWave\ABTesting\HttpSignatureMetaLoader;
 use SensorsWave\ABTesting\Storage;
 use SensorsWave\ABTesting\StorageFactory;
+use SensorsWave\Http\Request;
+use SensorsWave\Http\Response;
+use SensorsWave\Http\TransportInterface;
 
 /**
  * ABMetaSnapshotBootstrapTest — A 类完全派生测试。
@@ -47,6 +51,11 @@ final class ABMetaSnapshotBootstrapTest extends TestCase
     {
         if (!self::caseAppliesTo($case, 'php')) {
             $this->markTestSkipped('case does not apply to php');
+        }
+
+        if (($case['operation'] ?? null) === 'meta_request_headers') {
+            self::assertEquals($expected, self::runMetaRequestHeadersCase($case), 'meta request headers should match golden');
+            return;
         }
 
         $specPath = self::testdataDir() . '/' . (string) $case['spec_file'];
@@ -132,6 +141,88 @@ final class ABMetaSnapshotBootstrapTest extends TestCase
         }
 
         return in_array($language, $case['languages'], true);
+    }
+
+    /**
+     * @param array<string, mixed> $case
+     * @return array<string, mixed>
+     */
+    private static function runMetaRequestHeadersCase(array $case): array
+    {
+        $specPath = self::testdataDir() . '/' . (string) $case['spec_file'];
+        $body = file_get_contents($specPath);
+        self::assertNotFalse($body, "read spec file: $specPath");
+
+        $transport = new class($body) implements TransportInterface {
+            public ?Request $lastRequest = null;
+
+            public function __construct(private readonly string $body)
+            {
+            }
+
+            public function send(Request $request): Response
+            {
+                $this->lastRequest = $request;
+                return new Response(200, $this->body);
+            }
+        };
+
+        $loader = new HttpSignatureMetaLoader(
+            endpoint: 'https://collector.example.com',
+            uriPath: '/ab/all4eval',
+            sourceToken: 'test-token',
+            projectSecret: 'test-secret',
+            transport: $transport,
+        );
+        $loader->load();
+
+        self::assertNotNull($transport->lastRequest);
+        $headers = $transport->lastRequest->headers;
+        $authorization = (string) ($headers['Authorization'] ?? '');
+        $sdkVersion = (string) ($headers['X-SDK-Version'] ?? '');
+
+        return [
+            'authorization_signed_headers_include_sdk_version' => str_contains(strtolower($authorization), 'x-sdk-version'),
+            'has_only_allowed_headers' => self::hasOnlyAllowedMetaHeaders(array_keys($headers), $case),
+            'has_authorization' => $authorization !== '',
+            'has_sdk' => ((string) ($headers['X-SDK'] ?? '')) !== '',
+            'has_sdk_version' => $sdkVersion !== '',
+            'method' => $transport->lastRequest->method,
+            'ok' => true,
+            'path' => (string) parse_url($transport->lastRequest->url, PHP_URL_PATH),
+            'sdk_version_has_v_prefix' => str_starts_with($sdkVersion, 'v'),
+            'sdk_version_non_empty' => $sdkVersion !== '',
+            'source_token' => (string) ($headers['SourceToken'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array<int, string> $keys
+     */
+    private static function hasOnlyAllowedMetaHeaders(array $keys, array $case): bool
+    {
+        $allowed = [];
+        foreach (($case['allowed_headers'] ?? []) as $header) {
+            if (is_string($header)) {
+                $allowed[strtolower($header)] = true;
+            }
+        }
+        $ignored = [];
+        foreach (($case['ignored_transport_headers'] ?? []) as $header) {
+            if (is_string($header)) {
+                $ignored[strtolower($header)] = true;
+            }
+        }
+        foreach ($keys as $key) {
+            $normalized = strtolower($key);
+            if (isset($ignored[$normalized])) {
+                continue;
+            }
+            if (!isset($allowed[$normalized])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
