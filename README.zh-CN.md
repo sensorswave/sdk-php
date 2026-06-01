@@ -377,7 +377,7 @@ switch ($strategy) {
 | 方法 | 签名 | 说明 |
 |------|------|------|
 | **close** | `close(): void` | 将内存中的事件刷入本地队列并关闭客户端 |
-| **flush** | `flush(): void` | 将当前缓冲批次刷入本地队列，不关闭客户端 |
+| **flush** | `flush(): void` | **Deprecated** 兼容 no-op；推荐使用 `close()`，请求路径事件仍直接写入本地队列 |
 
 ### 用户身份
 

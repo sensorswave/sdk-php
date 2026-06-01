@@ -72,6 +72,8 @@ final class Client
      *
      * PHP request-path tracking writes every event directly into EventQueue;
      * HTTP delivery is handled by SendCommand.
+     *
+     * @deprecated Use close() for the client lifecycle. Remote delivery is handled by SendCommand.
      */
     public function flush(): void
     {

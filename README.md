@@ -377,7 +377,7 @@ switch ($strategy) {
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | **close** | `close(): void` | Mark the client closed; queued tracking events are delivered by `SendCommand` |
-| **flush** | `flush(): void` | Lifecycle-compatible no-op; PHP request-path tracking writes each event directly to `eventQueue` |
+| **flush** | `flush(): void` | **Deprecated** lifecycle-compatible no-op; use `close()`. PHP request-path tracking writes each event directly to `eventQueue` |
 
 ### User Identity
 
