@@ -66,6 +66,36 @@ final class SendCommandTest extends TestCase
         self::assertNotSame([], $queue->dequeue(50));
     }
 
+    public function testSendCommandDoesNotRetryUnauthorized(): void
+    {
+        $queue = new MemoryEventQueue();
+        $queue->enqueue(['{"event":"Unauthorized"}']);
+        $transport = new class implements TransportInterface {
+            /** @var list<Request> */
+            public array $requests = [];
+            /** @var list<int> */
+            private array $statuses = [401, 200];
+
+            public function send(Request $request): Response
+            {
+                $this->requests[] = $request;
+                return new Response(array_shift($this->statuses) ?? 200, '{"msg":"unauthorized"}');
+            }
+        };
+
+        $command = new SendCommand(
+            'https://collector.example.com',
+            'test-token',
+            new Config(eventQueue: $queue, httpRetry: 2),
+            $transport
+        );
+
+        self::assertSame(1, $command->run());
+        self::assertCount(1, $transport->requests);
+        self::assertSame(['{"event":"Unauthorized"}'], $queue->queued);
+        self::assertCount(0, $queue->claimed);
+    }
+
     /**
      * 多条消息应在同一次 dequeue 中全部取出并成功发送。
      */
