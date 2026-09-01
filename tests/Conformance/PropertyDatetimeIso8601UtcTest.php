@@ -102,11 +102,7 @@ final class PropertyDatetimeIso8601UtcTest extends TestCase
                     $options->setOnce((string) $key, $value);
                 }
                 return Event::create($anonId, $loginId, Predefined::EVENT_USER_SET)
-                    ->withUserPropertyOptions($options)
-                    ->withProperties(Properties::create()->set(
-                        Predefined::USER_SET_TYPE,
-                        Predefined::USER_SET_TYPE_SET_ONCE
-                    ));
+                    ->withUserPropertyOptions($options);
             }
 
             case 'profile_append': {
@@ -115,11 +111,7 @@ final class PropertyDatetimeIso8601UtcTest extends TestCase
                     $options->append((string) $key, $value);
                 }
                 return Event::create($anonId, $loginId, Predefined::EVENT_USER_SET)
-                    ->withUserPropertyOptions($options)
-                    ->withProperties(Properties::create()->set(
-                        Predefined::USER_SET_TYPE,
-                        Predefined::USER_SET_TYPE_APPEND
-                    ));
+                    ->withUserPropertyOptions($options);
             }
 
             case 'profile_union': {
@@ -128,11 +120,7 @@ final class PropertyDatetimeIso8601UtcTest extends TestCase
                     $options->union((string) $key, $value);
                 }
                 return Event::create($anonId, $loginId, Predefined::EVENT_USER_SET)
-                    ->withUserPropertyOptions($options)
-                    ->withProperties(Properties::create()->set(
-                        Predefined::USER_SET_TYPE,
-                        Predefined::USER_SET_TYPE_UNION
-                    ));
+                    ->withUserPropertyOptions($options);
             }
 
             default:

@@ -173,7 +173,6 @@ final class Client
             $this->createUserPropertyEvent(
                 $user,
                 $this->normalizeProperties($properties),
-                Predefined::USER_SET_TYPE_SET_ONCE,
                 'setOnce'
             )
         );
@@ -189,7 +188,6 @@ final class Client
             $this->createUserPropertyEvent(
                 $user,
                 $this->normalizeProperties($properties),
-                Predefined::USER_SET_TYPE_INCREMENT,
                 'increment'
             )
         );
@@ -217,7 +215,7 @@ final class Client
         foreach ($normalizedProperties->all() as $key => $value) {
             $options->append($key, $value);
         }
-        $this->track($this->buildUserPropertyEvent($user, $options, Predefined::USER_SET_TYPE_APPEND));
+        $this->track($this->buildUserPropertyEvent($user, $options));
     }
 
     /**
@@ -243,7 +241,7 @@ final class Client
         foreach ($normalizedProperties->all() as $key => $value) {
             $options->union($key, $value);
         }
-        $this->track($this->buildUserPropertyEvent($user, $options, Predefined::USER_SET_TYPE_UNION));
+        $this->track($this->buildUserPropertyEvent($user, $options));
     }
 
     /**
@@ -256,7 +254,7 @@ final class Client
         foreach ($propertyKeys as $propertyKey) {
             $options->unset($propertyKey);
         }
-        $this->track($this->buildUserPropertyEvent($user, $options, Predefined::USER_SET_TYPE_UNSET));
+        $this->track($this->buildUserPropertyEvent($user, $options));
     }
 
     /**
@@ -268,8 +266,7 @@ final class Client
         $this->track(
             $this->buildUserPropertyEvent(
                 $user,
-                UserPropertyOptions::create()->delete(),
-                Predefined::USER_SET_TYPE_DELETE
+                UserPropertyOptions::create()->delete()
             )
         );
     }
@@ -385,7 +382,6 @@ final class Client
     private function createUserPropertyEvent(
         User $user,
         Properties $properties,
-        string $type,
         string $method
     ): Event {
         $options = UserPropertyOptions::create();
@@ -396,17 +392,16 @@ final class Client
             $options->{$method}($key, $value);
         }
 
-        return $this->buildUserPropertyEvent($user, $options, $type);
+        return $this->buildUserPropertyEvent($user, $options);
     }
 
     /**
      * 构造用户属性事件。
      */
-    private function buildUserPropertyEvent(User $user, UserPropertyOptions $options, string $type): Event
+    private function buildUserPropertyEvent(User $user, UserPropertyOptions $options): Event
     {
         return Event::create($user->anonId(), $user->loginId(), Predefined::EVENT_USER_SET)
-            ->withUserPropertyOptions($options)
-            ->withProperties(Properties::create()->set(Predefined::USER_SET_TYPE, $type));
+            ->withUserPropertyOptions($options);
     }
 
     /**

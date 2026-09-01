@@ -7,7 +7,6 @@ namespace SensorsWave\Tests\Conformance;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SensorsWave\Model\Event;
-use SensorsWave\Model\Properties;
 use SensorsWave\Model\UserPropertyOptions;
 use SensorsWave\Tracking\Predefined;
 
@@ -74,7 +73,6 @@ final class UserProfileOpsTest extends TestCase
         $loginId = (string) ($case['login_id'] ?? '');
         $operation = (string) $case['operation'];
         $options = UserPropertyOptions::create();
-        $type = '';
 
         switch ($operation) {
             case 'profile_append':
@@ -83,7 +81,6 @@ final class UserProfileOpsTest extends TestCase
                 foreach ($listProps as $key => $values) {
                     $options->append((string) $key, $values);
                 }
-                $type = Predefined::USER_SET_TYPE_APPEND;
                 break;
 
             case 'profile_union':
@@ -92,7 +89,6 @@ final class UserProfileOpsTest extends TestCase
                 foreach ($listProps as $key => $values) {
                     $options->union((string) $key, $values);
                 }
-                $type = Predefined::USER_SET_TYPE_UNION;
                 break;
 
             case 'profile_increment':
@@ -103,7 +99,6 @@ final class UserProfileOpsTest extends TestCase
                         $options->increment((string) $key, $value);
                     }
                 }
-                $type = Predefined::USER_SET_TYPE_INCREMENT;
                 break;
 
             case 'profile_unset':
@@ -112,12 +107,10 @@ final class UserProfileOpsTest extends TestCase
                 foreach ($keys as $key) {
                     $options->unset((string) $key);
                 }
-                $type = Predefined::USER_SET_TYPE_UNSET;
                 break;
 
             case 'profile_delete':
                 $options->delete();
-                $type = Predefined::USER_SET_TYPE_DELETE;
                 break;
 
             default:
@@ -125,8 +118,7 @@ final class UserProfileOpsTest extends TestCase
         }
 
         return Event::create($anonId, $loginId, Predefined::EVENT_USER_SET)
-            ->withUserPropertyOptions($options)
-            ->withProperties(Properties::create()->set(Predefined::USER_SET_TYPE, $type));
+            ->withUserPropertyOptions($options);
     }
 
 }

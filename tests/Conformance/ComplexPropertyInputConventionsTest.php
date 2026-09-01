@@ -97,11 +97,7 @@ final class ComplexPropertyInputConventionsTest extends TestCase
                     $options->setOnce((string) $key, $value);
                 }
                 return Event::create($anonId, $loginId, Predefined::EVENT_USER_SET)
-                    ->withUserPropertyOptions($options)
-                    ->withProperties(Properties::create()->set(
-                        Predefined::USER_SET_TYPE,
-                        Predefined::USER_SET_TYPE_SET_ONCE
-                    ));
+                    ->withUserPropertyOptions($options);
             }
 
             case 'profile_append': {
@@ -110,11 +106,7 @@ final class ComplexPropertyInputConventionsTest extends TestCase
                     $options->append((string) $key, $values);
                 }
                 return Event::create($anonId, $loginId, Predefined::EVENT_USER_SET)
-                    ->withUserPropertyOptions($options)
-                    ->withProperties(Properties::create()->set(
-                        Predefined::USER_SET_TYPE,
-                        Predefined::USER_SET_TYPE_APPEND
-                    ));
+                    ->withUserPropertyOptions($options);
             }
 
             case 'profile_union': {
@@ -123,11 +115,7 @@ final class ComplexPropertyInputConventionsTest extends TestCase
                     $options->union((string) $key, $values);
                 }
                 return Event::create($anonId, $loginId, Predefined::EVENT_USER_SET)
-                    ->withUserPropertyOptions($options)
-                    ->withProperties(Properties::create()->set(
-                        Predefined::USER_SET_TYPE,
-                        Predefined::USER_SET_TYPE_UNION
-                    ));
+                    ->withUserPropertyOptions($options);
             }
 
             default:

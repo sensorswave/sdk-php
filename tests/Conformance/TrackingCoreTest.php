@@ -95,13 +95,7 @@ final class TrackingCoreTest extends TestCase
                     $options->setOnce((string) $key, $value);
                 }
                 return Event::create($anonId, $loginId, Predefined::EVENT_USER_SET)
-                    ->withUserPropertyOptions($options)
-                    ->withProperties(
-                        Properties::create()->set(
-                            Predefined::USER_SET_TYPE,
-                            Predefined::USER_SET_TYPE_SET_ONCE
-                        )
-                    );
+                    ->withUserPropertyOptions($options);
 
             default:
                 throw new \RuntimeException("unknown operation: $operation");

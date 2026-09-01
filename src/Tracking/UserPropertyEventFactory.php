@@ -25,12 +25,6 @@ final class UserPropertyEventFactory
         }
 
         return Event::create($user->anonId(), $user->loginId(), Predefined::EVENT_USER_SET)
-            ->withUserPropertyOptions($options)
-            ->withProperties(
-                Properties::create()->set(
-                    Predefined::USER_SET_TYPE,
-                    Predefined::USER_SET_TYPE_SET
-                )
-            );
+            ->withUserPropertyOptions($options);
     }
 }
